@@ -1,0 +1,176 @@
+import { exec } from 'child_process';
+import * as path from 'path';
+import { isBasicAuthInfo, ProductJira } from 'src/atlclients/authInfo';
+import { Container } from 'src/container';
+import { getHtmlForView } from 'src/webview/common/getHtmlForView';
+import {
+    CancellationToken,
+    Disposable,
+    Uri,
+    WebviewView,
+    WebviewViewProvider,
+    WebviewViewResolveContext,
+    window,
+} from 'vscode';
+
+import { FromUIHandler, MessageFromUI, MessageToUI } from './protocol';
+
+const pingQuery = `
+query me {
+  me {
+    user{
+      name
+    }
+  }
+}
+`;
+
+export class ShipitWebviewProvider extends Disposable implements WebviewViewProvider {
+    private _extensionPath: string;
+    private _extensionUri: Uri;
+    private _webView?: WebviewView['webview'];
+    private readonly viewType = 'shipitWebview';
+
+    private handler: FromUIHandler = {
+        isLifeOk: (message) => {
+            console.log('Received isLifeOk message:', message);
+            this.postMessage({
+                type: 'isLifeOkResponse',
+                status: 'not Daijoubu',
+            });
+        },
+        pingAgg: async (message) => {
+            const credentials = await this.getCloudCredentials();
+            if (!credentials) {
+                this.postMessage({
+                    type: 'pingAggResponse',
+                    status: 'error',
+                    error: 'No cloud credentials found',
+                });
+                return;
+            }
+
+            const response = await fetch(`https://${credentials?.host}/gateway/api/graphql`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Basic ${btoa(`${credentials.username}:${credentials.key}`)}`,
+                },
+                body: JSON.stringify({ query: pingQuery }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.postMessage({
+                    type: 'pingAggResponse',
+                    status: 'ok',
+                    response: data,
+                });
+            } else {
+                this.postMessage({
+                    type: 'pingAggResponse',
+                    status: 'error',
+                    error: 'Failed to ping AGG',
+                });
+            }
+        },
+        runProcess: (message) => {
+            console.log('Running process with echoText:', message.echoText);
+            exec(`echo ${message.echoText}`, (error, stdout, stderr) => {
+                window.showInformationMessage(`Process output: ${stdout}`);
+                if (error) {
+                    console.error('Error running process:', error);
+                    window.showErrorMessage(`Error running process: ${stderr}`);
+                }
+            });
+        },
+    };
+
+    constructor(extensionPath: string) {
+        super(() => {});
+        this._extensionPath = extensionPath;
+        this._extensionUri = Uri.file(this._extensionPath);
+        // Register the webview view provider
+        this._register();
+    }
+
+    private _register() {
+        window.registerWebviewViewProvider('atlascode.views.shipitWebviewView', this, {
+            webviewOptions: { retainContextWhenHidden: true },
+        });
+    }
+
+    public resolveWebviewView(
+        webviewView: WebviewView,
+        _context: WebviewViewResolveContext,
+        _token: CancellationToken,
+    ): void {
+        this._webView = webviewView.webview;
+        const webview = this._webView;
+        webview.options = {
+            enableScripts: true,
+            localResourceRoots: [Uri.file(path.join(this._extensionPath, 'build'))],
+        };
+        webview.html = getHtmlForView(
+            this._extensionPath,
+            webview.asWebviewUri(this._extensionUri),
+            webview.cspSource,
+            this.viewType,
+        );
+
+        webview.onDidReceiveMessage((message: MessageFromUI) => {
+            const handler = this.handler[message.type] as ((msg: any) => void) | undefined;
+            if (handler) {
+                handler(message);
+            }
+        });
+
+        this.getCloudCredentials().then((credentials) => {
+            if (credentials) {
+                this.postMessage({
+                    type: 'initialize',
+                    status: 'unknown',
+                    authenticationType: 'api token',
+                });
+            }
+        });
+    }
+
+    postMessage = (message: MessageToUI) => {
+        if (this._webView) {
+            this._webView.postMessage(message);
+        } else {
+            console.warn('Webview is not initialized');
+        }
+    };
+
+    // Literal copy-paste of our cloud credential lookup :)
+    // Feel free to adjust as needed
+    async getCloudCredentials(): Promise<{ username: string; key: string; host: string } | undefined> {
+        const sites = Container.siteManager.getSitesAvailable(ProductJira);
+
+        const promises = sites.map(async (site) => {
+            if (!site.isCloud) {
+                return undefined;
+            }
+
+            if (!site.host.endsWith('.atlassian.net')) {
+                return undefined;
+            }
+
+            const authInfo = await Container.credentialManager.getAuthInfo(sites[0]);
+            if (!isBasicAuthInfo(authInfo)) {
+                return undefined;
+            }
+
+            return {
+                username: authInfo.username,
+                key: authInfo.password,
+                host: site.host,
+            };
+        });
+
+        const results = (await Promise.all(promises)).filter((result) => result !== undefined);
+        return results.length > 0 ? results[0] : undefined;
+    }
+}
