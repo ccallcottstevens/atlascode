@@ -1038,6 +1038,24 @@ ${message}`;
         await this.executeChat({ text: prompt, context }, false);
     }
 
+    async startBackgroundSession(webviewView?: WebviewView): Promise<void> {
+        // Focus the webview first
+        commands.executeCommand('atlascode.views.rovoDev.webView.focus');
+
+        // Wait for the webview to initialize, up to 5 seconds
+        const initialized = await this.waitFor(() => !!this._webView, 5000, 50);
+        if (!initialized) {
+            console.error('Webview is not initialized after waiting.');
+            return;
+        }
+
+        // Start a new session by calling executeReset, but don't wait for user interaction
+        // This will reset the current session and start fresh in the background
+        await this.executeReset();
+
+        // Log that a background session was started
+        Logger.debug('Background Rovo Dev session started successfully');
+    }
     /**
      * Adds a context item to the RovoDev webview. Intended for external calls, e.g. commands
      * @param contextItem The context item to add.

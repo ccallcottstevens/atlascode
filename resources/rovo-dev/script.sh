@@ -4,7 +4,7 @@
 # Jump into the folder if not already there
 cd resources/rovo-dev || true
 
-# Clean up old files 
+# Clean up old files ro
 
 rm -rf rovodev.zip lib ripgrep 
 rm atlassian_cli_rovodev

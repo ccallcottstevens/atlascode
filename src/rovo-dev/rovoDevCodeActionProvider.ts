@@ -24,6 +24,13 @@ export class RovoDevCodeActionProvider implements vscode.CodeActionProvider {
                     title: 'Add to Rovo Dev Context',
                 },
             },
+            {
+                title: 'Rovo Dev: Start background session',
+                command: {
+                    command: Commands.RovodevStartBackgroundSession,
+                    title: 'Rovo Dev: Start Background Session',
+                },
+            },
         ];
     }
 

@@ -84,6 +84,7 @@ export const enum Commands {
     RovodevAsk = 'atlascode.rovodev.askRovoDev',
     RovodevAskInteractive = 'atlascode.rovodev.askInteractive',
     RovodevAddToContext = 'atlascode.rovodev.addToContext',
+    RovodevStartBackgroundSession = 'atlascode.rovodev.startBackgroundSession',
     RovodevNewSession = 'atlascode.rovodev.newChatSession',
     InProgressIssue = 'atlascode.jira.inProgressIssue',
     DoneIssue = 'atlascode.jira.doneIssue',
