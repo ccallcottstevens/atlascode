@@ -106,6 +106,10 @@
                 "title": "Add selection to Rovo Dev context"
             },
             {
+                "command": "atlascode.rovodev.startBackgroundSession",
+                "title": "Start Rovo Dev background session"
+            },
+            {
                 "command": "atlascode.rovodev.newChatSession",
                 "title": "New chat session",
                 "icon": {
@@ -794,6 +798,10 @@
                 },
                 {
                     "command": "atlascode.rovodev.addToContext",
+                    "when": "false"
+                },
+                {
+                    "command": "atlascode.rovodev.startBackgroundSession",
                     "when": "false"
                 },
                 {
