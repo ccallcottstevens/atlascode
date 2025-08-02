@@ -260,6 +260,9 @@ export function registerRovoDevCommands(vscodeContext: ExtensionContext) {
         commands.registerCommand(Commands.RovodevStartBackgroundSession, () => {
             Container.rovodevWebviewProvider.startBackgroundSession();
         }),
+        commands.registerCommand(Commands.RovodevListBackgroundSessions, () => {
+            Container.rovodevWebviewProvider.listBackgroundSessions();
+        }),
     );
     vscodeContext.subscriptions.push(
         commands.registerCommand(Commands.RovodevAddToContext, async () => {

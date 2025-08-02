@@ -13,6 +13,10 @@ export type FromUI = {
     createWorktree: {
         message?: string;
     };
+    createBackgroundSession: {
+        sessionName: string;
+        prompt?: string;
+    };
     listWorktrees: {};
     removeWorktree: {
         worktreePath: string;
@@ -43,6 +47,14 @@ export type ToUI = {
     worktreeCreated: {
         status: 'success' | 'error';
         path?: string;
+        error?: string;
+    };
+    backgroundSessionCreated: {
+        status: 'success' | 'error';
+        sessionId?: string;
+        sessionName?: string;
+        worktreePath?: string;
+        port?: number;
         error?: string;
     };
     worktreesList: {

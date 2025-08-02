@@ -76,6 +76,7 @@ export class Container {
     private static _commonMessageHandler: CommonActionMessageHandler;
     private static _bitbucketHelper: CheckoutHelper;
     private static _assignedWorkItemsView: AssignedWorkItemsViewProvider;
+    static shipitWebviewProvider: any;
 
     static async initialize(context: ExtensionContext, version: string) {
         const analyticsEnv: string = this.isDebugging ? 'staging' : 'prod';

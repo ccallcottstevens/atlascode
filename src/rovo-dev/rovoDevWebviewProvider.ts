@@ -363,6 +363,16 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
                     case RovoDevViewResponseType.ReportThinkingDrawerExpanded:
                         this.fireTelemetryEvent('rovoDevDetailsExpandedEvent', this._currentPromptId);
                         break;
+
+                    case RovoDevViewResponseType.NewSession:
+                        if (e.sessionName) {
+                            this.createNewBackgroundSession(e.sessionName, e.prompt);
+                        }
+                        break;
+
+                    case RovoDevViewResponseType.CreateBackgroundSession:
+                        this.createBackgroundSessionWithShipit(e.sessionName, e.prompt);
+                        break;
                 }
             } catch (error) {
                 this.processError(error, false);
@@ -1183,13 +1193,166 @@ ${message}`;
             return;
         }
 
-        // Start a new session by calling executeReset, but don't wait for user interaction
-        // This will reset the current session and start fresh in the background
+        // Send message to webview to open the NewSessionModal
+        if (this._webView) {
+            await this._webView.postMessage({
+                type: RovoDevProviderMessageType.OpenNewSessionModal,
+            });
+        }
+
+        Logger.debug('Background session modal opened from action button');
+    }
+
+    async listBackgroundSessions(): Promise<void> {
+        // Focus the webview first
+        commands.executeCommand('atlascode.views.rovoDev.webView.focus');
+
+        try {
+            // Get the Shipit webview provider from the container
+            const shipitProvider = Container.shipitWebviewProvider;
+            if (!shipitProvider) {
+                window.showWarningMessage(
+                    'Background sessions require ShipIt integration. Please ensure ShipIt is available.',
+                );
+                return;
+            }
+
+            // For now, show available options including creating a new session
+            const items = [
+                {
+                    label: '$(add) Start New Background Session',
+                    description: 'Create a new background session with a custom prompt',
+                    action: 'new',
+                },
+                {
+                    label: '$(home) Switch to Main Session',
+                    description: 'Return to the main RovoDev session',
+                    action: 'main',
+                },
+                {
+                    label: '$(list-unordered) View Active Sessions',
+                    description: 'See all running background sessions (requires ShipIt)',
+                    action: 'list',
+                },
+            ];
+
+            const selected = await window.showQuickPick(items, {
+                placeHolder: 'Select a session option',
+                title: 'RovoDev Background Sessions',
+            });
+
+            if (!selected) {
+                return; // User cancelled
+            }
+
+            switch (selected.action) {
+                case 'new':
+                    await this.startBackgroundSession();
+                    break;
+                case 'main':
+                    // Switch back to main session by getting the main workspace port
+                    const mainPort = this.getWorkspacePort();
+                    if (mainPort) {
+                        this.switchToServer(mainPort);
+                        window.showInformationMessage('Switched to main RovoDev session');
+                    } else {
+                        window.showWarningMessage('Could not find main RovoDev session port');
+                    }
+                    break;
+                case 'list':
+                    // Request list from ShipitWebviewProvider
+                    shipitProvider.postMessage({
+                        type: 'listWorktrees',
+                    });
+
+                    // Show information about how to access background sessions
+                    const response = await window.showInformationMessage(
+                        'Active background sessions are managed through ShipIt. Would you like to open the ShipIt view to see and manage your background sessions?',
+                        'Open ShipIt View',
+                        'Cancel',
+                    );
+
+                    if (response === 'Open ShipIt View') {
+                        // Focus the ShipIt webview if available
+                        commands.executeCommand('workbench.view.extension.atlascodeViewsContainer');
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            Logger.debug(`Background sessions action: ${selected.action}`);
+        } catch (error) {
+            const errorMessage = `Failed to list background sessions: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            window.showErrorMessage(errorMessage);
+            Logger.debug(errorMessage);
+        }
+    }
+
+    private async createNewBackgroundSession(sessionName: string, prompt?: string): Promise<void> {
+        // Reset the current session
         await this.executeReset();
 
-        // Log that a background session was started
-        Logger.debug('Background Rovo Dev session started successfully');
+        // If an initial prompt is provided, execute it
+        if (prompt?.trim()) {
+            const promptMessage = {
+                type: RovoDevViewResponseType.Prompt,
+                text: prompt.trim(),
+                enable_deep_plan: false,
+                context: {},
+            };
+            await this.executeChat(promptMessage);
+        }
+
+        // Log that a new named session was created
+        Logger.debug(`New background session "${sessionName}" created`);
     }
+
+    private async createBackgroundSessionWithShipit(sessionName: string, prompt?: string): Promise<void> {
+        try {
+            // Get the Shipit webview provider from the container
+            const shipitProvider = Container.shipitWebviewProvider;
+            if (!shipitProvider) {
+                Logger.debug('Shipit webview provider not available');
+                window.showWarningMessage(
+                    'Background sessions require ShipIt integration. Please ensure ShipIt is available.',
+                );
+                return;
+            }
+
+            // Show initial message that session is being created
+            const statusMessage = prompt
+                ? `Creating background session "${sessionName}" and starting prompt...`
+                : `Creating background session "${sessionName}"...`;
+            window.showInformationMessage(statusMessage);
+
+            // Send message to create background session via Shipit
+            shipitProvider.postMessage({
+                type: 'createBackgroundSession',
+                sessionName,
+                prompt,
+            });
+
+            Logger.debug(
+                `Background session "${sessionName}" creation request sent to Shipit${prompt ? ' with prompt' : ''}`,
+            );
+
+            // If there's a prompt, let the user know it will run in the background
+            if (prompt?.trim()) {
+                // Use global setTimeout instead of the imported one from timers/promises
+                (global as any).setTimeout(() => {
+                    window.showInformationMessage(
+                        `Background session "${sessionName}" is running your prompt. You can continue working while it processes.`,
+                    );
+                }, 2000); // Show after 2 seconds to allow time for session creation
+            }
+        } catch (error) {
+            const errorMessage = `Failed to create background session "${sessionName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
+            window.showErrorMessage(errorMessage);
+            Logger.debug(errorMessage);
+        }
+    }
+
     /**
      * Adds a context item to the RovoDev webview. Intended for external calls, e.g. commands
      * @param contextItem The context item to add.

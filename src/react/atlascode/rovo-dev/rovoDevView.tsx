@@ -1,5 +1,6 @@
 import './RovoDev.css';
 import './RovoDevCodeHighlighting.css';
+import './components/BackgroundSessionStyles.css';
 
 import CloseIcon from '@atlaskit/icon/core/close';
 import { highlightElement } from '@speed-highlight/core';
@@ -12,6 +13,7 @@ import { v4 } from 'uuid';
 import { RovoDevResponse } from '../../../rovo-dev/responseParser';
 import { RovoDevProviderMessage, RovoDevProviderMessageType } from '../../../rovo-dev/rovoDevWebviewProviderMessages';
 import { useMessagingApi } from '../messagingApi';
+import { NewSessionModal } from './components/NewSessionModal';
 import { ChatStream } from './messaging/ChatStream';
 import { PromptInputBox } from './prompt-box/prompt-input/PromptInput';
 import { PromptContextCollection } from './prompt-box/promptContext/promptContextCollection';
@@ -79,6 +81,7 @@ const RovoDevView: React.FC = () => {
     const [totalModifiedFiles, setTotalModifiedFiles] = useState<ToolReturnParseResult[]>([]);
     const [isDeepPlanCreated, setIsDeepPlanCreated] = useState(false);
     const [isDeepPlanToggled, setIsDeepPlanToggled] = useState(false);
+    const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
 
     const [outgoingMessage, dispatch] = useState<RovoDevViewResponse | undefined>(undefined);
 
@@ -431,6 +434,10 @@ const RovoDevView: React.FC = () => {
                 case RovoDevProviderMessageType.CheckGitChangesComplete:
                     break; // This is handled elsewhere
 
+                case RovoDevProviderMessageType.OpenNewSessionModal:
+                    setIsNewSessionModalOpen(true);
+                    break;
+
                 default:
                     // this is never supposed to happen since there aren't other type of messages
                     handleAppendError({
@@ -512,6 +519,25 @@ const RovoDevView: React.FC = () => {
         sendPrompt(CODE_PLAN_EXECUTE_PROMPT);
     }, [currentState, sendPrompt]);
 
+    const handleNewSession = useCallback(
+        (sessionName: string, prompt?: string) => {
+            // Send message to RovoDev backend to create a new background session
+            // This should integrate with ShipitWebviewProvider
+            postMessage({
+                type: RovoDevViewResponseType.CreateBackgroundSession,
+                sessionName,
+                prompt,
+            });
+
+            // Clear the UI state for the new session
+            clearChatHistory();
+            setPromptText('');
+
+            // Close the modal
+            setIsNewSessionModalOpen(false);
+        },
+        [postMessage, clearChatHistory],
+    );
     const retryPromptAfterError = useCallback((): void => {
         // Disable the send button, and enable the pause button
         setCurrentState(State.GeneratingResponse);
@@ -681,6 +707,13 @@ const RovoDevView: React.FC = () => {
                     />
                 </div>
             </div>
+            {isNewSessionModalOpen && (
+                <NewSessionModal
+                    isOpen={isNewSessionModalOpen}
+                    onClose={() => setIsNewSessionModalOpen(false)}
+                    onCreateBackgroundSession={handleNewSession}
+                />
+            )}
         </div>
     );
 };

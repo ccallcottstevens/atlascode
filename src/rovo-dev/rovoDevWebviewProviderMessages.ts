@@ -22,6 +22,7 @@ export const enum RovoDevProviderMessageType {
     ContextAdded = 'contextAdded',
     ServerSwitched = 'serverSwitched',
     CheckGitChangesComplete = 'checkGitChangesComplete',
+    OpenNewSessionModal = 'openNewSessionModal',
 }
 
 export interface RovoDevObjectResponse {
@@ -45,4 +46,5 @@ export type RovoDevProviderMessage =
     | ReducerAction<RovoDevProviderMessageType.UserFocusUpdated, { userFocus: RovoDevContextItem }>
     | ReducerAction<RovoDevProviderMessageType.ContextAdded, { context: RovoDevContextItem }>
     | ReducerAction<RovoDevProviderMessageType.CheckGitChangesComplete, { hasChanges: boolean }>
-    | ReducerAction<RovoDevProviderMessageType.ServerSwitched, { port: number }>;
+    | ReducerAction<RovoDevProviderMessageType.ServerSwitched, { port: number }>
+    | ReducerAction<RovoDevProviderMessageType.OpenNewSessionModal>;

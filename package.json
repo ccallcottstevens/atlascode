@@ -107,7 +107,19 @@
             },
             {
                 "command": "atlascode.rovodev.startBackgroundSession",
-                "title": "Start Rovo Dev background session"
+                "title": "Start Rovo Dev background session",
+                "icon": {
+                    "dark": "resources/dark/add.svg",
+                    "light": "resources/light/add.svg"
+                }
+            },
+            {
+                "command": "atlascode.rovodev.listBackgroundSessions",
+                "title": "Switch to background session",
+                "icon": {
+                    "dark": "resources/dark/list-selection.svg",
+                    "light": "resources/light/list-selection.svg"
+                }
             },
             {
                 "command": "atlascode.rovodev.newChatSession",
@@ -591,6 +603,16 @@
                     "command": "atlascode.rovodev.newChatSession",
                     "when": "view == atlascode.views.rovoDev.webView",
                     "group": "navigation@1"
+                },
+                {
+                    "command": "atlascode.rovodev.startBackgroundSession",
+                    "when": "view == atlascode.views.rovoDev.webView",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "atlascode.rovodev.listBackgroundSessions",
+                    "when": "view == atlascode.views.rovoDev.webView",
+                    "group": "navigation@3"
                 },
                 {
                     "command": "atlascode.jira.createIssue",
