@@ -10,6 +10,18 @@ export type FromUI = {
     someOtherMessage: {
         data: string;
     };
+    createWorktree: {
+        message?: string;
+    };
+    listWorktrees: {};
+    removeWorktree: {
+        worktreePath: string;
+    };
+    connectToWorktreeRovoDev: {
+        worktreePath: string;
+    };
+    getWorktreeRovoDevServers: {};
+    getSelectedRovoDevServer: {};
 };
 
 export type ToUI = {
@@ -27,6 +39,33 @@ export type ToUI = {
         status: 'ok' | 'error';
         error?: string;
         response?: any;
+    };
+    worktreeCreated: {
+        status: 'success' | 'error';
+        path?: string;
+        error?: string;
+    };
+    worktreesList: {
+        status: 'success' | 'error';
+        worktrees?: string[];
+        error?: string;
+    };
+    worktreeRemoved: {
+        status: 'success' | 'error';
+        error?: string;
+    };
+    worktreeRovoDevConnected: {
+        status: 'success' | 'error';
+        port?: number;
+        worktreePath?: string;
+        error?: string;
+    };
+    worktreeRovoDevServers: {
+        servers: Array<{ path: string; port: number; type: 'workspace' | 'worktree'; healthy?: boolean }>;
+    };
+    selectedRovoDevServer: {
+        port?: number;
+        path?: string;
     };
 };
 

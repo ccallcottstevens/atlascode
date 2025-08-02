@@ -101,13 +101,16 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
 
     private _disposables: Disposable[] = [];
 
+    // Session ID to filter responses from the currently active server
+    private _activeServerSessionId: string = '';
+
     private _globalState: Memento;
     private _extensionPath: string;
     private _extensionUri: Uri;
 
     private get rovoDevApiClient() {
         if (!this._rovoDevApiClient) {
-            const rovoDevPort = this.getWorkspacePort();
+            const rovoDevPort = this.getActiveRovoDevPort();
             const rovoDevHost = process.env[rovodevInfo.envVars.host] || 'localhost';
             if (rovoDevPort) {
                 this._rovoDevApiClient = new RovoDevApiClient(rovoDevHost, rovoDevPort);
@@ -115,6 +118,92 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
         }
 
         return this._rovoDevApiClient;
+    }
+
+    // Force recreation of API client when server changes
+    public switchToServer(port: number) {
+        // Generate new session ID for the active server
+        this._activeServerSessionId = v4();
+
+        // Reset UI state to allow new input
+        this._pendingCancellation = false;
+        this._currentPrompt = undefined;
+        this._pendingPrompt = undefined;
+
+        this.postMessage({
+            type: RovoDevProviderMessageType.ServerSwitched,
+            port: port,
+        });
+        this._rovoDevApiClient = undefined; // Clear cached client
+        const rovoDevHost = process.env[rovodevInfo.envVars.host] || 'localhost';
+        this._rovoDevApiClient = new RovoDevApiClient(rovoDevHost, port);
+
+        // Send server switched message to clear chat
+
+        // wait for Rovo Dev to be ready, for up to 10 seconds
+        this.waitFor(() => this.executeHealthcheck(), 100000, 500)
+            .then(async (result) => {
+                if (result) {
+                    this.beginNewSession();
+                    // if (this.isBBY) {
+                    // TODO: we should obtain the session id from the boysenberry environment
+                    await this.executeReplay();
+                } else {
+                    const errorMsg = this._rovoDevApiClient
+                        ? `Unable to initialize RovoDev at "${this._rovoDevApiClient.baseApiUrl}". Service wasn't ready within 10000ms`
+                        : `Unable to initialize RovoDev's client within 10000ms`;
+
+                    throw new Error(errorMsg);
+                }
+
+                this._initialized = true;
+                // re-send the buffered prompt
+                if (this._pendingPrompt) {
+                    this.executeChat(this._pendingPrompt, true);
+                    this._pendingPrompt = undefined;
+                }
+            })
+            .catch((error) => {
+                this.processError(error, false);
+            })
+            .finally(() => {
+                this._initialized = true;
+
+                this._webView?.postMessage({
+                    type: RovoDevProviderMessageType.Initialized,
+                });
+            });
+    }
+
+    private postMessage(message: RovoDevProviderMessage): Thenable<boolean> | undefined {
+        return this._webView?.postMessage(message);
+    }
+
+    private getActiveRovoDevPort(): number | undefined {
+        // Check if there's a selected server from ShipIt
+        const selectedPort = Container.context.globalState.get<number>('selectedRovoDevPort');
+        if (selectedPort) {
+            return selectedPort;
+        }
+
+        // Initialize with main workspace as default if no selection exists
+        const workspacePort = this.getWorkspacePort();
+        if (workspacePort) {
+            this.initializeDefaultSelection(workspacePort);
+            return workspacePort;
+        }
+
+        return undefined;
+    }
+
+    private initializeDefaultSelection(port: number) {
+        // Set main workspace as default selection
+        const workspaceFolders = workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            const mainWorkspacePath = workspaceFolders[0].uri.fsPath;
+            Container.context.globalState.update('selectedRovoDevPort', port);
+            Container.context.globalState.update('selectedRovoDevPath', mainWorkspacePath);
+        }
     }
 
     constructor(extensionPath: string, globalState: Memento) {
@@ -125,6 +214,9 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
         this._extensionPath = extensionPath;
         this._extensionUri = Uri.file(this._extensionPath);
         this._globalState = globalState;
+
+        // Initialize with a session ID for the initial server
+        this._activeServerSessionId = v4();
 
         // Register the webview view provider
         this._disposables.push(
@@ -425,7 +517,11 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
         );
     }
 
-    private async processChatResponse(sourceApi: 'chat' | 'replay', fetchOp: Promise<Response> | Response) {
+    private async processChatResponse(
+        sourceApi: 'chat' | 'replay',
+        fetchOp: Promise<Response> | Response,
+        sessionId?: string,
+    ) {
         const fireTelemetry = sourceApi === 'chat';
         const response = await fetchOp;
         if (!response.body) {
@@ -443,39 +539,62 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
         let isFirstByte = true;
         let isFirstMessage = true;
 
-        while (true) {
-            const { done, value } = await reader.read();
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
 
-            if (fireTelemetry && isFirstByte) {
-                this._perfLogger.promptFirstByteReceived(this._currentPromptId);
-                isFirstByte = false;
-            }
-
-            if (done) {
-                // last response of the stream -> fire performance telemetry event
-                if (fireTelemetry) {
-                    this._perfLogger.promptLastMessageReceived(this._currentPromptId);
+                if (fireTelemetry && isFirstByte) {
+                    this._perfLogger.promptFirstByteReceived(this._currentPromptId);
+                    isFirstByte = false;
                 }
 
-                for (const msg of parser.flush()) {
+                if (done) {
+                    // last response of the stream -> fire performance telemetry event
+                    if (fireTelemetry) {
+                        this._perfLogger.promptLastMessageReceived(this._currentPromptId);
+                    }
+
+                    for (const msg of parser.flush()) {
+                        // Only process responses from the currently active server session
+                        if (sessionId && sessionId !== this._activeServerSessionId) {
+                            continue; // Skip responses from inactive servers
+                        }
+                        await this.processRovoDevResponse(sourceApi, msg);
+                    }
+                    break;
+                }
+
+                const data = decoder.decode(value, { stream: true });
+                for (const msg of parser.parse(data)) {
+                    // Only process responses from the currently active server session
+                    if (sessionId && sessionId !== this._activeServerSessionId) {
+                        continue; // Skip responses from inactive servers
+                    }
+
+                    if (fireTelemetry && isFirstMessage) {
+                        this._perfLogger.promptFirstMessageReceived(this._currentPromptId);
+                        isFirstMessage = false;
+                    }
+
                     await this.processRovoDevResponse(sourceApi, msg);
                 }
-                break;
             }
 
-            const data = decoder.decode(value, { stream: true });
-            for (const msg of parser.parse(data)) {
-                if (fireTelemetry && isFirstMessage) {
-                    this._perfLogger.promptFirstMessageReceived(this._currentPromptId);
-                    isFirstMessage = false;
-                }
-
-                await this.processRovoDevResponse(sourceApi, msg);
+            // Send final complete message when stream ends
+            if (sessionId && sessionId === this._activeServerSessionId) {
+                await this.completeChatResponse(sourceApi);
+            }
+        } catch (error) {
+            // Re-throw errors
+            throw error;
+        } finally {
+            // Clean up the reader
+            try {
+                reader.releaseLock();
+            } catch {
+                // Ignore errors when releasing lock
             }
         }
-
-        // Send final complete message when stream ends
-        await this.completeChatResponse(sourceApi);
     }
 
     private completeChatResponse(sourceApi: 'replay' | 'chat' | 'error') {
@@ -524,7 +643,7 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
     private processRovoDevResponse(sourceApi: 'chat' | 'replay', response: RovoDevResponse): Thenable<boolean> {
         const fireTelemetry = sourceApi === 'chat';
         const webview = this._webView!;
-
+        setTimeout(50); // Yield to allow UI updates
         switch (response.event_kind) {
             case 'text':
                 return webview.postMessage({
@@ -672,12 +791,16 @@ ${message}`;
         payloadToSend = this.addContextToPrompt(payloadToSend, context);
 
         const currentPrompt = this._currentPrompt;
+
+        // Use current active session ID to filter responses
+        const currentSessionId = this._activeServerSessionId;
+
         const fetchOp = async (client: RovoDevApiClient) => {
             const response = await client.chat(payloadToSend, enable_deep_plan);
 
             this.fireTelemetryEvent('rovoDevPromptSentEvent', this._currentPromptId, !!currentPrompt.enable_deep_plan);
 
-            return this.processChatResponse('chat', response);
+            return this.processChatResponse('chat', response, currentSessionId);
         };
 
         if (this._initialized) {
@@ -711,12 +834,15 @@ ${message}`;
             context: currentPrompt.context,
         });
 
+        // Use current active session ID to filter responses
+        const currentSessionId = this._activeServerSessionId;
+
         const fetchOp = async (client: RovoDevApiClient) => {
             const response = await client.chat(payloadToSend, currentPrompt.enable_deep_plan);
 
             this.fireTelemetryEvent('rovoDevPromptSentEvent', this._currentPromptId, !!currentPrompt.enable_deep_plan);
 
-            return this.processChatResponse('chat', response);
+            return this.processChatResponse('chat', response, currentSessionId);
         };
 
         await this.executeApiWithErrorHandling(fetchOp, true);
@@ -836,8 +962,11 @@ ${message}`;
     private async executeReplay(): Promise<void> {
         this.beginNewPrompt('replay');
 
+        // Use current active session ID for replay
+        const currentSessionId = this._activeServerSessionId;
+
         await this.executeApiWithErrorHandling(async (client) => {
-            return this.processChatResponse('replay', client.replay());
+            return this.processChatResponse('replay', client.replay(), currentSessionId);
         }, false);
     }
 
@@ -873,7 +1002,12 @@ ${message}`;
         if (tryShowDiff) {
             try {
                 cachedFilePath = await this.rovoDevApiClient?.getCacheFilePath(filePath);
-            } catch {}
+            } catch (error) {
+                // Ignore 404 errors when switching servers - cache files from old server won't exist on new server
+                if (error.httpStatus !== 404) {
+                    console.warn(`Failed to get cache file path for ${filePath}:`, error);
+                }
+            }
         }
 
         // Get workspace root and resolve the file path
