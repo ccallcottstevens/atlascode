@@ -1,4 +1,7 @@
 import React, { useEffect, useRef } from 'react';
+import { RovoDevContext, RovoDevContextItem } from 'src/rovo-dev/rovoDevTypes';
+
+import { PromptContextCollection } from '../prompt-box/promptContext/promptContextCollection';
 
 interface BackgroundSession {
     id: string;
@@ -13,6 +16,10 @@ interface BackgroundSessionsDropdownProps {
     sessions: BackgroundSession[];
     onSelectSession: (sessionId: string) => void;
     onDeleteSession: (sessionId: string) => void;
+    promptContextCollection?: RovoDevContext;
+    onAddContext?: () => void;
+    onRemoveContext?: (item: RovoDevContextItem) => void;
+    onToggleActiveItem?: (enabled: boolean) => void;
 }
 
 export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProps> = ({
@@ -21,6 +28,10 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
     sessions,
     onSelectSession,
     onDeleteSession,
+    promptContextCollection,
+    onAddContext,
+    onRemoveContext,
+    onToggleActiveItem,
 }) => {
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,9 +64,9 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
             top: '4px',
             right: '12px',
             zIndex: 1000,
-            minWidth: '300px',
-            maxWidth: '400px',
-            maxHeight: '300px',
+            minWidth: '350px',
+            maxWidth: '500px',
+            maxHeight: '500px',
             overflowY: 'auto',
         };
     };
@@ -240,6 +251,53 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
                         </div>
                     </div>
                 ))
+            )}
+
+            {/* Add a separator line if we have both sessions and context */}
+            {sessions.length > 0 && promptContextCollection && (
+                <div
+                    style={{
+                        height: '1px',
+                        backgroundColor: 'var(--vscode-panel-border)',
+                        margin: '8px 0',
+                    }}
+                />
+            )}
+
+            {/* Context Collection section */}
+            {promptContextCollection && onAddContext && onRemoveContext && onToggleActiveItem && (
+                <div style={{ marginTop: sessions.length > 0 ? '8px' : '0' }}>
+                    <div
+                        style={{
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: 'var(--vscode-foreground)',
+                            marginBottom: '8px',
+                            padding: '0 8px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <span>Context Files</span>
+                        <span
+                            style={{
+                                fontSize: '11px',
+                                color: 'var(--vscode-descriptionForeground)',
+                                fontWeight: '400',
+                            }}
+                        >
+                            {promptContextCollection.contextItems?.length || 0} files
+                        </span>
+                    </div>
+                    <PromptContextCollection
+                        content={promptContextCollection}
+                        readonly={false}
+                        onAddContext={onAddContext}
+                        onRemoveContext={onRemoveContext}
+                        onToggleActiveItem={onToggleActiveItem}
+                    />
+                </div>
             )}
         </div>
     );

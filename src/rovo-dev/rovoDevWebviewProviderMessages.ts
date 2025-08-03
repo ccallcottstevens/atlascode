@@ -2,7 +2,7 @@ import { ReducerAction } from '@atlassianlabs/guipi-core-controller';
 
 import { ChatMessage, ErrorMessage } from '../react/atlascode/rovo-dev/utils';
 import { RovoDevResponse } from './responseParser';
-import { RovoDevContextItem, RovoDevPrompt } from './rovoDevTypes';
+import { RovoDevContext, RovoDevContextItem, RovoDevPrompt } from './rovoDevTypes';
 
 export const enum RovoDevProviderMessageType {
     PromptSent = 'promptSent',
@@ -22,7 +22,7 @@ export const enum RovoDevProviderMessageType {
     ContextAdded = 'contextAdded',
     ServerSwitched = 'serverSwitched',
     CheckGitChangesComplete = 'checkGitChangesComplete',
-    OpenNewSessionModal = 'openNewSessionModal',
+    OpenNewSessionDropdown = 'openNewSessionDropdown',
     BackgroundSessionsUpdated = 'backgroundSessionsUpdated',
     OpenBackgroundSessionsDropdown = 'openBackgroundSessionsDropdown',
 }
@@ -56,6 +56,6 @@ export type RovoDevProviderMessage =
     | ReducerAction<RovoDevProviderMessageType.ContextAdded, { context: RovoDevContextItem }>
     | ReducerAction<RovoDevProviderMessageType.CheckGitChangesComplete, { hasChanges: boolean }>
     | ReducerAction<RovoDevProviderMessageType.ServerSwitched, { port: number }>
-    | ReducerAction<RovoDevProviderMessageType.OpenNewSessionModal>
+    | ReducerAction<RovoDevProviderMessageType.OpenNewSessionDropdown, { context?: RovoDevContext }>
     | ReducerAction<RovoDevProviderMessageType.BackgroundSessionsUpdated, { sessions: BackgroundSession[] }>
     | ReducerAction<RovoDevProviderMessageType.OpenBackgroundSessionsDropdown>;

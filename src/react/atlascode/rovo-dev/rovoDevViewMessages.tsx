@@ -46,7 +46,10 @@ export type RovoDevViewResponse =
     | ReducerAction<RovoDevViewResponseType.ReportThinkingDrawerExpanded>
     | ReducerAction<RovoDevViewResponseType.CheckGitChanges>
     | ReducerAction<RovoDevViewResponseType.NewSession, { sessionName?: string; prompt?: string }>
-    | ReducerAction<RovoDevViewResponseType.CreateBackgroundSession, { sessionName: string; prompt?: string }>
+    | ReducerAction<
+          RovoDevViewResponseType.CreateBackgroundSession,
+          { sessionName: string; prompt?: string; context?: RovoDevContext }
+      >
     | ReducerAction<RovoDevViewResponseType.ListBackgroundSessions>
     | ReducerAction<RovoDevViewResponseType.SelectBackgroundSession, { sessionId: string }>
     | ReducerAction<RovoDevViewResponseType.DeleteBackgroundSession, { sessionId: string }>;

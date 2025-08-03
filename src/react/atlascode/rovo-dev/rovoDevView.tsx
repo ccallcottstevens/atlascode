@@ -86,7 +86,8 @@ const RovoDevView: React.FC = () => {
     const [totalModifiedFiles, setTotalModifiedFiles] = useState<ToolReturnParseResult[]>([]);
     const [isDeepPlanCreated, setIsDeepPlanCreated] = useState(false);
     const [isDeepPlanToggled, setIsDeepPlanToggled] = useState(false);
-    const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
+    const [isNewSessionDropdownOpen, setIsNewSessionDropdownOpen] = useState(false);
+    const [newSessionContext, setNewSessionContext] = useState<RovoDevContext | undefined>(undefined);
     const [isBackgroundSessionsOpen, setIsBackgroundSessionsOpen] = useState(false);
     const [backgroundSessions, setBackgroundSessions] = useState<BackgroundSession[]>([]);
 
@@ -440,16 +441,18 @@ const RovoDevView: React.FC = () => {
                 case RovoDevProviderMessageType.CheckGitChangesComplete:
                     break; // This is handled elsewhere
 
-                case RovoDevProviderMessageType.OpenNewSessionModal:
-                    setIsNewSessionModalOpen(true);
+                case RovoDevProviderMessageType.OpenNewSessionDropdown:
+                    setIsNewSessionDropdownOpen(true);
+                    // Store any context that came with the message for the new session
+                    setNewSessionContext(event.context);
                     // Close background sessions dropdown if open
                     setIsBackgroundSessionsOpen(false);
                     break;
 
                 case RovoDevProviderMessageType.OpenBackgroundSessionsDropdown:
                     setIsBackgroundSessionsOpen(true);
-                    // Close new session modal if open
-                    setIsNewSessionModalOpen(false);
+                    // Close new session dropdown if open
+                    setIsNewSessionDropdownOpen(false);
                     break;
 
                 case RovoDevProviderMessageType.BackgroundSessionsUpdated:
@@ -542,22 +545,29 @@ const RovoDevView: React.FC = () => {
 
     const handleNewSession = useCallback(
         (sessionName: string, prompt?: string) => {
+            // Use the new session context if available (from command), otherwise use current prompt context
+            const contextToUse = newSessionContext || promptContextCollection;
+
             // Send message to RovoDev backend to create a new background session
             // This should integrate with ShipitWebviewProvider
             postMessage({
                 type: RovoDevViewResponseType.CreateBackgroundSession,
                 sessionName,
                 prompt,
+                context: contextToUse,
             });
 
             // Clear the prompt input but don't clear chat history
             // The session switching will handle chat state properly
             setPromptText('');
 
-            // Close the modal
-            setIsNewSessionModalOpen(false);
+            // Clear the new session context since it's been used
+            setNewSessionContext(undefined);
+
+            // Close the dropdown
+            setIsNewSessionDropdownOpen(false);
         },
-        [postMessage],
+        [postMessage, promptContextCollection, newSessionContext],
     );
 
     const handleSelectBackgroundSession = useCallback(
@@ -749,11 +759,15 @@ const RovoDevView: React.FC = () => {
                     />
                 </div>
             </div>
-            {isNewSessionModalOpen && (
+            {isNewSessionDropdownOpen && (
                 <NewSessionDropdown
-                    isOpen={isNewSessionModalOpen}
-                    onClose={() => setIsNewSessionModalOpen(false)}
+                    isOpen={isNewSessionDropdownOpen}
+                    onClose={() => {
+                        setIsNewSessionDropdownOpen(false);
+                        setNewSessionContext(undefined);
+                    }}
                     onCreateBackgroundSession={handleNewSession}
+                    context={newSessionContext}
                 />
             )}
             {isBackgroundSessionsOpen && (
@@ -763,6 +777,38 @@ const RovoDevView: React.FC = () => {
                     sessions={backgroundSessions}
                     onSelectSession={handleSelectBackgroundSession}
                     onDeleteSession={handleDeleteBackgroundSession}
+                    promptContextCollection={promptContextCollection}
+                    onAddContext={() => {
+                        postMessage({
+                            type: RovoDevViewResponseType.AddContext,
+                            currentContext: promptContextCollection,
+                        });
+                    }}
+                    onRemoveContext={(item: RovoDevContextItem) => {
+                        setPromptContextCollection((prev) => ({
+                            ...prev,
+                            contextItems: prev.contextItems?.filter(
+                                (contextItem) =>
+                                    contextItem.file.absolutePath !== item.file.absolutePath ||
+                                    contextItem.selection?.start !== item.selection?.start ||
+                                    contextItem.selection?.end !== item.selection?.end,
+                            ),
+                        }));
+                    }}
+                    onToggleActiveItem={(enabled) => {
+                        setPromptContextCollection((prev) => {
+                            if (!prev.focusInfo) {
+                                return prev;
+                            }
+                            return {
+                                ...prev,
+                                focusInfo: {
+                                    ...prev.focusInfo,
+                                    enabled,
+                                },
+                            };
+                        });
+                    }}
                 />
             )}
         </div>

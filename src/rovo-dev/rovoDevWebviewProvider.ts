@@ -386,7 +386,7 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
                         break;
 
                     case RovoDevViewResponseType.CreateBackgroundSession:
-                        this.createBackgroundSessionWithShipit(e.sessionName, e.prompt);
+                        this.createBackgroundSessionWithShipit(e.sessionName, e.prompt, e.context);
                         break;
 
                     case RovoDevViewResponseType.ListBackgroundSessions:
@@ -1209,7 +1209,7 @@ ${message}`;
         await this.executeChat({ text: prompt, context }, false);
     }
 
-    async startBackgroundSession(webviewView?: WebviewView): Promise<void> {
+    async startBackgroundSession(webviewView?: WebviewView, context?: RovoDevContext): Promise<void> {
         // Focus the webview first
         commands.executeCommand('atlascode.views.rovoDev.webView.focus');
 
@@ -1220,10 +1220,11 @@ ${message}`;
             return;
         }
 
-        // Send message to webview to open the NewSessionModal
+        // Send message to webview to open the NewSessionDropdown with context
         if (this._webView) {
             await this._webView.postMessage({
-                type: RovoDevProviderMessageType.OpenNewSessionModal,
+                type: RovoDevProviderMessageType.OpenNewSessionDropdown,
+                context,
             });
         }
     }
@@ -1379,17 +1380,20 @@ ${message}`;
         }
     }
 
-    private async createNewBackgroundSession(sessionName: string, prompt?: string): Promise<void> {
+    private async createNewBackgroundSession(
+        sessionName: string,
+        prompt?: string,
+        context?: RovoDevContext,
+    ): Promise<void> {
         // Reset the current session
         await this.executeReset();
 
         // If an initial prompt is provided, execute it
         if (prompt?.trim()) {
-            const promptMessage = {
-                type: RovoDevViewResponseType.Prompt,
+            const promptMessage: RovoDevPrompt = {
                 text: prompt.trim(),
                 enable_deep_plan: false,
-                context: {},
+                context: context || {},
             };
             await this.executeChat(promptMessage);
         }
@@ -1397,7 +1401,11 @@ ${message}`;
         // Log that a new named session was created
     }
 
-    private async createBackgroundSessionWithShipit(sessionName: string, prompt?: string): Promise<void> {
+    private async createBackgroundSessionWithShipit(
+        sessionName: string,
+        prompt?: string,
+        context?: RovoDevContext,
+    ): Promise<void> {
         try {
             // Get the Shipit webview provider from the container
             const shipitProvider = Container.shipitRovodevWebviewProvider;

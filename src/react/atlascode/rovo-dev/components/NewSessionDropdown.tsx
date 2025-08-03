@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { RovoDevContext } from 'src/rovo-dev/rovoDevTypes';
 
 import { PromptInputBox } from '../prompt-box/prompt-input/PromptInput';
 import { State } from '../rovoDevView';
@@ -15,6 +16,7 @@ interface NewSessionDropdownProps {
     onClose: () => void;
     onCreateBackgroundSession: (prompt?: string) => void;
     defaultPrompt?: string;
+    context?: RovoDevContext;
 }
 
 export const NewSessionDropdown: React.FC<NewSessionDropdownProps> = ({
@@ -22,6 +24,7 @@ export const NewSessionDropdown: React.FC<NewSessionDropdownProps> = ({
     onClose,
     onCreateBackgroundSession,
     defaultPrompt = '',
+    context,
 }) => {
     const [prompt, setPrompt] = useState(defaultPrompt);
     const [isCreating, setIsCreating] = useState(false);
@@ -87,6 +90,27 @@ export const NewSessionDropdown: React.FC<NewSessionDropdownProps> = ({
                 boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
             }}
         >
+            {context && context.contextItems && context.contextItems.length > 0 && (
+                <div
+                    style={{
+                        marginBottom: '8px',
+                        padding: '6px 8px',
+                        backgroundColor: 'var(--vscode-badge-background)',
+                        color: 'var(--vscode-badge-foreground)',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                    }}
+                >
+                    <span>📎</span>
+                    <span>
+                        {context.contextItems.length} file{context.contextItems.length !== 1 ? 's' : ''} selected from
+                        editor
+                    </span>
+                </div>
+            )}
             <PromptInputBox
                 state={State.WaitingForPrompt}
                 promptText={prompt}

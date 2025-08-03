@@ -266,7 +266,9 @@ export function registerRovoDevCommands(vscodeContext: ExtensionContext) {
             Container.rovodevWebviewProvider.executeReset();
         }),
         commands.registerCommand(Commands.RovodevStartBackgroundSession, () => {
-            Container.rovodevWebviewProvider.startBackgroundSession();
+            // Get the current editor context to pass to the background session dropdown
+            const context = buildContext(window.activeTextEditor, vscodeContext);
+            Container.rovodevWebviewProvider.startBackgroundSession(undefined, context);
         }),
         commands.registerCommand(Commands.RovodevListBackgroundSessions, () => {
             Container.rovodevWebviewProvider.openBackgroundSessionsDropdown();
@@ -279,7 +281,12 @@ export function registerRovoDevCommands(vscodeContext: ExtensionContext) {
                 // Do nothing, this should only have effect in editor context
                 return;
             }
+
+            // Focus the RovoDev webview to ensure it's active
             commands.executeCommand('atlascode.views.rovoDev.webView.focus');
+
+            // Add each context item to the current session
+            // This will also make the context available for any new background sessions created afterward
             context.contextItems.forEach((item) => {
                 Container.rovodevWebviewProvider.addToContext(item);
             });
