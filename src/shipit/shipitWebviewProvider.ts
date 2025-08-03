@@ -521,6 +521,18 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
         }
     };
 
+    /**
+     * Create a worktree and optionally send a message to the RovoDev server
+     * This method can be called directly without requiring the webview to be initialized
+     */
+    public async createWorktreeWithMessage(message?: string): Promise<void> {
+        if (!this.handler.createWorktree || !message) {
+            return;
+        }
+        // Reuse the existing createWorktree handler logic
+        this.handler.createWorktree({ type: 'createWorktree', message: message! });
+    }
+
     private async waitFor(
         condition: () => Promise<boolean>,
         timeoutMs: number = 10000,

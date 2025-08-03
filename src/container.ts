@@ -34,6 +34,7 @@ import { Pipeline } from './pipelines/model';
 import { RovoDevCodeActionProvider } from './rovo-dev/rovoDevCodeActionProvider';
 import { RovoDevDecorator } from './rovo-dev/rovoDevDecorator';
 import { RovoDevWebviewProvider } from './rovo-dev/rovoDevWebviewProvider';
+import { ShipitWebviewProvider } from './shipit/shipitWebviewProvider';
 import { SiteManager } from './siteManager';
 import { AtlascodeUriHandler, ONBOARDING_URL, SETTINGS_URL } from './uriHandler';
 import { FeatureFlagClient, FeatureFlagClientInitError } from './util/featureFlags';
@@ -221,6 +222,9 @@ export class Container {
             );
             context.subscriptions.push(
                 (this._rovodevWebviewProvider = new RovoDevWebviewProvider(context.extensionPath, context.globalState)),
+            );
+            context.subscriptions.push(
+                (this._shipitRovodevWebviewProvider = new ShipitWebviewProvider(context.extensionPath)),
             );
             this.configureRovodevSettingsCommands(context);
         }
@@ -465,5 +469,10 @@ export class Container {
     private static _rovodevWebviewProvider: RovoDevWebviewProvider;
     public static get rovodevWebviewProvider() {
         return this._rovodevWebviewProvider;
+    }
+
+    private static _shipitRovodevWebviewProvider: ShipitWebviewProvider;
+    public static get shipitRovodevWebviewProvider() {
+        return this._shipitRovodevWebviewProvider;
     }
 }

@@ -15,6 +15,7 @@ import { runPipeline } from './commands/bitbucket/runPipeline';
 import { assignIssue } from './commands/jira/assignIssue';
 import { createIssue } from './commands/jira/createIssue';
 import { showIssue, showIssueForKey, showIssueForSiteIdAndKey, showIssueForURL } from './commands/jira/showIssue';
+import { startRovoDevWorkOnIssue } from './commands/jira/startRovoDevWorkOnIssue';
 import { startWorkOnIssue } from './commands/jira/startWorkOnIssue';
 import { configuration } from './config/configuration';
 import { Commands, HelpTreeViewId } from './constants';
@@ -166,6 +167,13 @@ export function registerCommands(vscodeContext: ExtensionContext) {
             Commands.StartWorkOnIssue,
             (issueNodeOrMinimalIssue: IssueNode | MinimalIssue<DetailedSiteInfo>) =>
                 startWorkOnIssue(
+                    isMinimalIssue(issueNodeOrMinimalIssue) ? issueNodeOrMinimalIssue : issueNodeOrMinimalIssue.issue,
+                ),
+        ),
+        commands.registerCommand(
+            Commands.StartRovoDevWorkOnIssue,
+            (issueNodeOrMinimalIssue: IssueNode | MinimalIssue<DetailedSiteInfo>) =>
+                startRovoDevWorkOnIssue(
                     isMinimalIssue(issueNodeOrMinimalIssue) ? issueNodeOrMinimalIssue : issueNodeOrMinimalIssue.issue,
                 ),
         ),

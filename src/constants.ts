@@ -64,6 +64,7 @@ export const enum Commands {
     AssignIssueToMe = 'atlascode.jira.assignIssueToMe',
     TransitionIssue = 'atlascode.jira.transitionIssue',
     StartWorkOnIssue = 'atlascode.jira.startWorkOnIssue',
+    StartRovoDevWorkOnIssue = 'atlascode.jira.startRovoDevWorkOnIssue',
     CreatePullRequest = 'atlascode.bb.createPullRequest',
     RerunPipeline = 'atlascode.bb.rerunPipeline',
     RunPipelineForBranch = 'atlascode.bb.runPipelineForBranch',

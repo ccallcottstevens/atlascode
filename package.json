@@ -68,7 +68,7 @@
         "test:e2e:docker": "cd e2e && docker compose run --rm atlascode-e2e; status=$?; docker compose down; exit $status",
         "test:e2e:docker:build": "docker build --tag atlascode-e2e - <e2e/Dockerfile",
         "test:e2e:docker:serve": "cd e2e && npm run test:e2e:docker:build && export ONLYSERVER=1 && docker compose up",
-        "devcompile": "npm run clean && npm run devcompile:react && npm run devcompile:extension",
+        "devcompile": "node -v && npm run clean && npm run devcompile:react && npm run devcompile:extension",
         "devcompile:react": "webpack --mode development --config webpack.react.dev.js --fail-on-warnings",
         "devcompile:extension": "webpack --mode development --config webpack.extension.dev.js --fail-on-warnings",
         "release:stable": "scripts/release.sh",
@@ -309,6 +309,11 @@
             {
                 "command": "atlascode.jira.startWorkOnIssue",
                 "title": "Start work on Jira issue",
+                "category": "Atlassian"
+            },
+            {
+                "command": "atlascode.jira.startRovoDevWorkOnIssue",
+                "title": "Launch RovoDev on Jira issue",
                 "category": "Atlassian"
             },
             {
@@ -713,6 +718,11 @@
                     "group": "jiraContextMenuGroup1"
                 },
                 {
+                    "command": "atlascode.jira.startRovoDevWorkOnIssue",
+                    "when": "viewItem =~ /(jiraIssue|assignedJiraIssue|jiraIssue_.+|assignedJiraIssue_.+)/ && atlascode:isJiraAuthenticated",
+                    "group": "jiraContextMenuGroup1"
+                },
+                {
                     "command": "atlascode.viewInWebBrowser",
                     "when": "viewItem =~ /(jiraIssue|assignedJiraIssue|jiraIssue_.+|assignedJiraIssue_.+)/ && atlascode:isJiraAuthenticated",
                     "group": "jiraContextMenuGroup1"
@@ -900,6 +910,10 @@
                 },
                 {
                     "command": "atlascode.jira.startWorkOnIssue",
+                    "when": "false"
+                },
+                {
+                    "command": "atlascode.jira.startRovoDevWorkOnIssue",
                     "when": "false"
                 },
                 {
