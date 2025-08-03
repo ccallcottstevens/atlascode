@@ -545,8 +545,9 @@ const RovoDevView: React.FC = () => {
 
     const handleNewSession = useCallback(
         (sessionName: string, prompt?: string) => {
-            // Use the new session context if available (from command), otherwise use current prompt context
-            const contextToUse = newSessionContext || promptContextCollection;
+            // Only use context if it came from a command (like RovodevStartBackgroundSession)
+            // Manual sessions start with empty context - users can add context explicitly if needed
+            const contextToUse = newSessionContext || {};
 
             // Send message to RovoDev backend to create a new background session
             // This should integrate with ShipitWebviewProvider
@@ -567,7 +568,7 @@ const RovoDevView: React.FC = () => {
             // Close the dropdown
             setIsNewSessionDropdownOpen(false);
         },
-        [postMessage, promptContextCollection, newSessionContext],
+        [postMessage, newSessionContext],
     );
 
     const handleSelectBackgroundSession = useCallback(
