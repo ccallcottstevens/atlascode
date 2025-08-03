@@ -19,6 +19,9 @@ export const enum RovoDevViewResponseType {
     CheckGitChanges = 'checkGitChanges',
     NewSession = 'newSession',
     CreateBackgroundSession = 'createBackgroundSession',
+    ListBackgroundSessions = 'listBackgroundSessions',
+    SelectBackgroundSession = 'selectBackgroundSession',
+    DeleteBackgroundSession = 'deleteBackgroundSession',
 }
 
 export interface ModifiedFile {
@@ -43,4 +46,7 @@ export type RovoDevViewResponse =
     | ReducerAction<RovoDevViewResponseType.ReportThinkingDrawerExpanded>
     | ReducerAction<RovoDevViewResponseType.CheckGitChanges>
     | ReducerAction<RovoDevViewResponseType.NewSession, { sessionName?: string; prompt?: string }>
-    | ReducerAction<RovoDevViewResponseType.CreateBackgroundSession, { sessionName: string; prompt?: string }>;
+    | ReducerAction<RovoDevViewResponseType.CreateBackgroundSession, { sessionName: string; prompt?: string }>
+    | ReducerAction<RovoDevViewResponseType.ListBackgroundSessions>
+    | ReducerAction<RovoDevViewResponseType.SelectBackgroundSession, { sessionId: string }>
+    | ReducerAction<RovoDevViewResponseType.DeleteBackgroundSession, { sessionId: string }>;

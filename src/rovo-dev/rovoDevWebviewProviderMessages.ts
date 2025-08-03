@@ -23,10 +23,22 @@ export const enum RovoDevProviderMessageType {
     ServerSwitched = 'serverSwitched',
     CheckGitChangesComplete = 'checkGitChangesComplete',
     OpenNewSessionModal = 'openNewSessionModal',
+    BackgroundSessionsUpdated = 'backgroundSessionsUpdated',
+    OpenBackgroundSessionsDropdown = 'openBackgroundSessionsDropdown',
 }
 
 export interface RovoDevObjectResponse {
     dataObject: RovoDevResponse;
+}
+
+export interface BackgroundSession {
+    id: string;
+    name: string;
+    prompt?: string;
+    isActive: boolean;
+    worktreePath?: string;
+    port?: number;
+    isRunning?: boolean;
 }
 
 export type RovoDevProviderMessage =
@@ -47,4 +59,6 @@ export type RovoDevProviderMessage =
     | ReducerAction<RovoDevProviderMessageType.ContextAdded, { context: RovoDevContextItem }>
     | ReducerAction<RovoDevProviderMessageType.CheckGitChangesComplete, { hasChanges: boolean }>
     | ReducerAction<RovoDevProviderMessageType.ServerSwitched, { port: number }>
-    | ReducerAction<RovoDevProviderMessageType.OpenNewSessionModal>;
+    | ReducerAction<RovoDevProviderMessageType.OpenNewSessionModal>
+    | ReducerAction<RovoDevProviderMessageType.BackgroundSessionsUpdated, { sessions: BackgroundSession[] }>
+    | ReducerAction<RovoDevProviderMessageType.OpenBackgroundSessionsDropdown>;

@@ -373,6 +373,18 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
                     case RovoDevViewResponseType.CreateBackgroundSession:
                         this.createBackgroundSessionWithShipit(e.sessionName, e.prompt);
                         break;
+
+                    case RovoDevViewResponseType.ListBackgroundSessions:
+                        this.listBackgroundSessionsForDropdown();
+                        break;
+
+                    case RovoDevViewResponseType.SelectBackgroundSession:
+                        this.selectBackgroundSession(e.sessionId);
+                        break;
+
+                    case RovoDevViewResponseType.DeleteBackgroundSession:
+                        this.deleteBackgroundSession(e.sessionId);
+                        break;
                 }
             } catch (error) {
                 this.processError(error, false);
@@ -1201,6 +1213,122 @@ ${message}`;
         }
 
         Logger.debug('Background session modal opened from action button');
+    }
+
+    async openBackgroundSessionsDropdown(): Promise<void> {
+        // Focus the webview first
+        commands.executeCommand('atlascode.views.rovoDev.webView.focus');
+
+        // Wait for the webview to initialize
+        const initialized = await this.waitFor(() => !!this._webView, 5000, 50);
+        if (!initialized) {
+            console.error('Webview is not initialized after waiting.');
+            return;
+        }
+
+        // Send message to webview to open the BackgroundSessionsDropdown
+        if (this._webView) {
+            await this._webView.postMessage({
+                type: RovoDevProviderMessageType.OpenBackgroundSessionsDropdown,
+            });
+        }
+
+        Logger.debug('Background sessions dropdown opened from action button');
+    }
+
+    async listBackgroundSessionsForDropdown(): Promise<void> {
+        try {
+            // Get the Shipit webview provider from the container to access background sessions
+            const shipitProvider = Container.shipitWebviewProvider;
+            if (!shipitProvider) {
+                // Send empty list if Shipit is not available
+                if (this._webView) {
+                    await this._webView.postMessage({
+                        type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
+                        sessions: [],
+                    });
+                }
+                return;
+            }
+
+            // For now, send mock data - this should be replaced with actual ShipIt integration
+            const mockSessions = [
+                {
+                    id: 'session-1',
+                    name: 'Main Development',
+                    isActive: true,
+                    isRunning: true,
+                    prompt: 'Working on the main feature branch',
+                    port: 8080,
+                },
+                {
+                    id: 'session-2',
+                    name: 'Bug Fix Session',
+                    isActive: false,
+                    isRunning: true,
+                    prompt: 'Fixing authentication issue',
+                    port: 8081,
+                },
+            ];
+
+            if (this._webView) {
+                await this._webView.postMessage({
+                    type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
+                    sessions: mockSessions,
+                });
+            }
+        } catch (error) {
+            Logger.error(error as Error, 'Failed to list background sessions');
+        }
+    }
+
+    async selectBackgroundSession(sessionId: string): Promise<void> {
+        try {
+            // Get the Shipit webview provider to handle session switching
+            const shipitProvider = Container.shipitWebviewProvider;
+            if (!shipitProvider) {
+                window.showWarningMessage('Background sessions require ShipIt integration.');
+                return;
+            }
+
+            // For now, just show a message - this should be replaced with actual switching logic
+            window.showInformationMessage(`Switching to background session: ${sessionId}`);
+
+            // TODO: Implement actual session switching via ShipIt
+            // This would involve getting the session details and switching the RovoDev backend port
+        } catch (error) {
+            Logger.error(error as Error, 'Failed to select background session');
+            window.showErrorMessage('Failed to switch to background session');
+        }
+    }
+
+    async deleteBackgroundSession(sessionId: string): Promise<void> {
+        try {
+            // Get the Shipit webview provider to handle session deletion
+            const shipitProvider = Container.shipitWebviewProvider;
+            if (!shipitProvider) {
+                window.showWarningMessage('Background sessions require ShipIt integration.');
+                return;
+            }
+
+            // For now, just show a confirmation - this should be replaced with actual deletion logic
+            const confirmed = await window.showWarningMessage(
+                `Are you sure you want to delete the background session?`,
+                { modal: true },
+                'Delete',
+            );
+
+            if (confirmed === 'Delete') {
+                window.showInformationMessage(`Deleting background session: ${sessionId}`);
+
+                // TODO: Implement actual session deletion via ShipIt
+                // After deletion, refresh the sessions list
+                this.listBackgroundSessionsForDropdown();
+            }
+        } catch (error) {
+            Logger.error(error as Error, 'Failed to delete background session');
+            window.showErrorMessage('Failed to delete background session');
+        }
     }
 
     async listBackgroundSessions(): Promise<void> {

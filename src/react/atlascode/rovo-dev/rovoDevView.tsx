@@ -11,8 +11,13 @@ import { RovoDevContext, RovoDevContextItem } from 'src/rovo-dev/rovoDevTypes';
 import { v4 } from 'uuid';
 
 import { RovoDevResponse } from '../../../rovo-dev/responseParser';
-import { RovoDevProviderMessage, RovoDevProviderMessageType } from '../../../rovo-dev/rovoDevWebviewProviderMessages';
+import {
+    BackgroundSession,
+    RovoDevProviderMessage,
+    RovoDevProviderMessageType,
+} from '../../../rovo-dev/rovoDevWebviewProviderMessages';
 import { useMessagingApi } from '../messagingApi';
+import { BackgroundSessionsDropdown } from './components/BackgroundSessionsDropdown';
 import { NewSessionDropdown } from './components/NewSessionDropdown';
 import { ChatStream } from './messaging/ChatStream';
 import { PromptInputBox } from './prompt-box/prompt-input/PromptInput';
@@ -82,6 +87,8 @@ const RovoDevView: React.FC = () => {
     const [isDeepPlanCreated, setIsDeepPlanCreated] = useState(false);
     const [isDeepPlanToggled, setIsDeepPlanToggled] = useState(false);
     const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
+    const [isBackgroundSessionsOpen, setIsBackgroundSessionsOpen] = useState(false);
+    const [backgroundSessions, setBackgroundSessions] = useState<BackgroundSession[]>([]);
 
     const [outgoingMessage, dispatch] = useState<RovoDevViewResponse | undefined>(undefined);
 
@@ -438,6 +445,14 @@ const RovoDevView: React.FC = () => {
                     setIsNewSessionModalOpen(true);
                     break;
 
+                case RovoDevProviderMessageType.OpenBackgroundSessionsDropdown:
+                    setIsBackgroundSessionsOpen(true);
+                    break;
+
+                case RovoDevProviderMessageType.BackgroundSessionsUpdated:
+                    setBackgroundSessions(event.sessions);
+                    break;
+
                 default:
                     // this is never supposed to happen since there aren't other type of messages
                     handleAppendError({
@@ -504,10 +519,13 @@ const RovoDevView: React.FC = () => {
         [currentState, isDeepPlanCreated, isDeepPlanToggled, postMessage, promptContextCollection],
     );
 
-    // On the first render, get the context update
+    // On the first render, get the context update and background sessions list
     React.useEffect(() => {
         postMessage?.({
             type: RovoDevViewResponseType.ForceUserFocusUpdate,
+        });
+        postMessage?.({
+            type: RovoDevViewResponseType.ListBackgroundSessions,
         });
     }, [postMessage]);
 
@@ -537,6 +555,27 @@ const RovoDevView: React.FC = () => {
             setIsNewSessionModalOpen(false);
         },
         [postMessage, clearChatHistory],
+    );
+
+    const handleSelectBackgroundSession = useCallback(
+        (sessionId: string) => {
+            postMessage({
+                type: RovoDevViewResponseType.SelectBackgroundSession,
+                sessionId,
+            });
+            setIsBackgroundSessionsOpen(false);
+        },
+        [postMessage],
+    );
+
+    const handleDeleteBackgroundSession = useCallback(
+        (sessionId: string) => {
+            postMessage({
+                type: RovoDevViewResponseType.DeleteBackgroundSession,
+                sessionId,
+            });
+        },
+        [postMessage],
     );
     const retryPromptAfterError = useCallback((): void => {
         // Disable the send button, and enable the pause button
@@ -712,6 +751,15 @@ const RovoDevView: React.FC = () => {
                     isOpen={isNewSessionModalOpen}
                     onClose={() => setIsNewSessionModalOpen(false)}
                     onCreateBackgroundSession={handleNewSession}
+                />
+            )}
+            {isBackgroundSessionsOpen && (
+                <BackgroundSessionsDropdown
+                    isOpen={isBackgroundSessionsOpen}
+                    onClose={() => setIsBackgroundSessionsOpen(false)}
+                    sessions={backgroundSessions}
+                    onSelectSession={handleSelectBackgroundSession}
+                    onDeleteSession={handleDeleteBackgroundSession}
                 />
             )}
         </div>
