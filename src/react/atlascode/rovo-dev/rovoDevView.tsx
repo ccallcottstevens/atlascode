@@ -544,10 +544,16 @@ const RovoDevView: React.FC = () => {
     }, [currentState, sendPrompt]);
 
     const handleNewSession = useCallback(
-        (sessionName: string, prompt?: string) => {
+        (prompt?: string) => {
             // Only use context if it came from a command (like RovodevStartBackgroundSession)
             // Manual sessions start with empty context - users can add context explicitly if needed
             const contextToUse = newSessionContext || {};
+
+            // Generate session name from prompt or use a default
+            const sessionName =
+                prompt && prompt.trim()
+                    ? prompt.trim().substring(0, 50) // Limit length for display
+                    : `Session ${new Date().toLocaleTimeString()}`;
 
             // Send message to RovoDev backend to create a new background session
             // This should integrate with ShipitWebviewProvider
