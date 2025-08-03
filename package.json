@@ -116,10 +116,7 @@
             {
                 "command": "atlascode.rovodev.listBackgroundSessions",
                 "title": "Switch to background session",
-                "icon": {
-                    "dark": "resources/dark/list-selection.svg",
-                    "light": "resources/light/list-selection.svg"
-                }
+                "icon": "$(layers)"
             },
             {
                 "command": "atlascode.rovodev.newChatSession",
