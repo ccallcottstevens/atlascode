@@ -233,6 +233,9 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
         // Initialize with a session ID for the initial server
         this._activeServerSessionId = v4();
 
+        // Initialize chat session ID to prevent telemetry errors
+        this._chatSessionId = v4();
+
         // Register the webview view provider
         this._disposables.push(
             window.registerWebviewViewProvider('atlascode.views.rovoDev.webView', this, {
@@ -1257,7 +1260,7 @@ ${message}`;
             const mainPort = this.getWorkspacePort();
             const currentPort = this.getActiveRovoDevPort();
 
-            // Create the main session entry
+            // Create the main session entry (always include it)
             const mainSession = {
                 id: 'main',
                 name: 'Main',
@@ -1499,14 +1502,6 @@ ${message}`;
                         const currentPort = this.getActiveRovoDevPort();
                         const mainPort = this.getWorkspacePort();
 
-                        // Create the main session entry
-                        const mainSession = {
-                            id: 'main',
-                            name: 'Main',
-                            isActive: mainPort ? currentPort === mainPort : false,
-                            isRunning: mainPort !== undefined, // Main session is running if it has a port
-                        };
-
                         // Convert ShipIt session format to RovoDev format
                         const backgroundSessions = response.sessions.map((session: any) => ({
                             id: session.sessionId,
@@ -1514,6 +1509,14 @@ ${message}`;
                             isActive: currentPort === session.port, // Check if this session is currently active
                             isRunning: true, // All sessions from ShipIt are running
                         }));
+
+                        // Create the main session entry
+                        const mainSession = {
+                            id: 'main',
+                            name: 'Main',
+                            isActive: mainPort ? currentPort === mainPort : false,
+                            isRunning: mainPort !== undefined, // Main session is running if it has a port
+                        };
 
                         // Combine main session with background sessions (main session first)
                         const allSessions = [mainSession, ...backgroundSessions];
