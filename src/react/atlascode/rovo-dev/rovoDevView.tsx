@@ -777,38 +777,6 @@ const RovoDevView: React.FC = () => {
                     sessions={backgroundSessions}
                     onSelectSession={handleSelectBackgroundSession}
                     onDeleteSession={handleDeleteBackgroundSession}
-                    promptContextCollection={promptContextCollection}
-                    onAddContext={() => {
-                        postMessage({
-                            type: RovoDevViewResponseType.AddContext,
-                            currentContext: promptContextCollection,
-                        });
-                    }}
-                    onRemoveContext={(item: RovoDevContextItem) => {
-                        setPromptContextCollection((prev) => ({
-                            ...prev,
-                            contextItems: prev.contextItems?.filter(
-                                (contextItem) =>
-                                    contextItem.file.absolutePath !== item.file.absolutePath ||
-                                    contextItem.selection?.start !== item.selection?.start ||
-                                    contextItem.selection?.end !== item.selection?.end,
-                            ),
-                        }));
-                    }}
-                    onToggleActiveItem={(enabled) => {
-                        setPromptContextCollection((prev) => {
-                            if (!prev.focusInfo) {
-                                return prev;
-                            }
-                            return {
-                                ...prev,
-                                focusInfo: {
-                                    ...prev.focusInfo,
-                                    enabled,
-                                },
-                            };
-                        });
-                    }}
                 />
             )}
         </div>

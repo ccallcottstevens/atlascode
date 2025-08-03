@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RovoDevContext } from 'src/rovo-dev/rovoDevTypes';
 
 import { PromptInputBox } from '../prompt-box/prompt-input/PromptInput';
+import { PromptContextCollection } from '../prompt-box/promptContext/promptContextCollection';
 import { State } from '../rovoDevView';
 
 interface BackgroundSession {
@@ -91,24 +92,8 @@ export const NewSessionDropdown: React.FC<NewSessionDropdownProps> = ({
             }}
         >
             {context && context.contextItems && context.contextItems.length > 0 && (
-                <div
-                    style={{
-                        marginBottom: '8px',
-                        padding: '6px 8px',
-                        backgroundColor: 'var(--vscode-badge-background)',
-                        color: 'var(--vscode-badge-foreground)',
-                        borderRadius: '3px',
-                        fontSize: '11px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                    }}
-                >
-                    <span>📎</span>
-                    <span>
-                        {context.contextItems.length} file{context.contextItems.length !== 1 ? 's' : ''} selected from
-                        editor
-                    </span>
+                <div style={{ marginBottom: '8px' }}>
+                    <PromptContextCollection content={context} readonly={true} direction="column" align="left" />
                 </div>
             )}
             <PromptInputBox
