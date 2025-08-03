@@ -20,6 +20,7 @@ interface PromptInputBoxProps {
     onCancel: () => void;
     sendButtonDisabled?: boolean;
     onAddContext: () => void;
+    placeholder?: string; // Optional custom placeholder text
 }
 export const PromptInputBox: React.FC<PromptInputBoxProps> = ({
     state,
@@ -31,6 +32,7 @@ export const PromptInputBox: React.FC<PromptInputBoxProps> = ({
     onCancel,
     sendButtonDisabled = false,
     onAddContext,
+    placeholder,
 }) => {
     const TextAreaMessages: Record<State, string> = {
         [State.WaitingForPrompt]: 'Type in a question',
@@ -49,7 +51,7 @@ export const PromptInputBox: React.FC<PromptInputBoxProps> = ({
         [state, onSend, promptText],
     );
     const getTextAreaPlaceholder = () => {
-        return TextAreaMessages[state] || 'Type in a question';
+        return placeholder || TextAreaMessages[state] || 'Type in a question';
     };
 
     return (

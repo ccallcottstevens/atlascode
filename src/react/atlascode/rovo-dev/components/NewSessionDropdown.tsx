@@ -6,10 +6,7 @@ import { State } from '../rovoDevView';
 interface BackgroundSession {
     id: string;
     name: string;
-    prompt?: string;
     isActive: boolean;
-    worktreePath?: string;
-    port?: number;
     isRunning?: boolean;
 }
 
@@ -100,6 +97,7 @@ export const NewSessionDropdown: React.FC<NewSessionDropdownProps> = ({
                 onCancel={onClose}
                 sendButtonDisabled={isCreating}
                 onAddContext={() => {}}
+                placeholder="Start background session"
             />
         </div>
     );

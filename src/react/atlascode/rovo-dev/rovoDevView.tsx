@@ -391,7 +391,6 @@ const RovoDevView: React.FC = () => {
                     // Set to generating state while server initializes and replays
                     setCurrentState(State.GeneratingResponse);
 
-                    console.log('Server switched, clearing chat for new server context');
                     clearChatHistory();
                     setPendingToolCallMessage('');
                     break;
@@ -443,10 +442,14 @@ const RovoDevView: React.FC = () => {
 
                 case RovoDevProviderMessageType.OpenNewSessionModal:
                     setIsNewSessionModalOpen(true);
+                    // Close background sessions dropdown if open
+                    setIsBackgroundSessionsOpen(false);
                     break;
 
                 case RovoDevProviderMessageType.OpenBackgroundSessionsDropdown:
                     setIsBackgroundSessionsOpen(true);
+                    // Close new session modal if open
+                    setIsNewSessionModalOpen(false);
                     break;
 
                 case RovoDevProviderMessageType.BackgroundSessionsUpdated:
@@ -547,14 +550,14 @@ const RovoDevView: React.FC = () => {
                 prompt,
             });
 
-            // Clear the UI state for the new session
-            clearChatHistory();
+            // Clear the prompt input but don't clear chat history
+            // The session switching will handle chat state properly
             setPromptText('');
 
             // Close the modal
             setIsNewSessionModalOpen(false);
         },
-        [postMessage, clearChatHistory],
+        [postMessage],
     );
 
     const handleSelectBackgroundSession = useCallback(

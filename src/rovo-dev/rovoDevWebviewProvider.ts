@@ -121,9 +121,11 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
     }
 
     // Force recreation of API client when server changes
-    public switchToServer(port: number) {
-        // Generate new session ID for the active server
-        this._activeServerSessionId = v4();
+    public switchToServer(port: number, isNewSession: boolean = true) {
+        // Generate new session ID for the active server only if this is truly a new session
+        if (isNewSession) {
+            this._activeServerSessionId = v4();
+        }
 
         // Reset UI state to allow new input
         this._pendingCancellation = false;
@@ -141,19 +143,32 @@ export class RovoDevWebviewProvider extends Disposable implements WebviewViewPro
         // Send server switched message to clear chat
 
         // wait for Rovo Dev to be ready, for up to 10 seconds
-        this.waitFor(() => this.executeHealthcheck(), 100000, 500)
+        this.waitFor(() => this.executeHealthcheck(), 10000, 500)
             .then(async (result) => {
                 if (result) {
-                    this.beginNewSession();
-                    // if (this.isBBY) {
-                    // TODO: we should obtain the session id from the boysenberry environment
-                    await this.executeReplay();
+                    Logger.debug(`RovoDev server at port ${port} is ready, initializing session...`);
+
+                    // Only begin new session if this is actually a new session
+                    // For existing sessions with history, we want to preserve the session ID
+                    if (isNewSession) {
+                        this.beginNewSession();
+                    }
+
+                    try {
+                        // Execute replay to restore chat history
+                        await this.executeReplay();
+                        Logger.debug(`Successfully replayed chat history for port ${port}`);
+                    } catch (error) {
+                        Logger.error(error as Error, `Failed to replay chat history for port ${port}`);
+                        // Continue without failing completely
+                    }
                 } else {
                     const errorMsg = this._rovoDevApiClient
-                        ? `Unable to initialize RovoDev at "${this._rovoDevApiClient.baseApiUrl}". Service wasn't ready within 10000ms`
-                        : `Unable to initialize RovoDev's client within 10000ms`;
+                        ? `Unable to initialize RovoDev at "${this._rovoDevApiClient.baseApiUrl}". Service wasn't ready within 10s`
+                        : `Unable to initialize RovoDev's client within 10s`;
 
-                    throw new Error(errorMsg);
+                    Logger.error(new Error(errorMsg), 'Server switch failed');
+                    window.showErrorMessage(`Failed to switch to session: ${errorMsg}`);
                 }
 
                 this._initialized = true;
@@ -1211,8 +1226,6 @@ ${message}`;
                 type: RovoDevProviderMessageType.OpenNewSessionModal,
             });
         }
-
-        Logger.debug('Background session modal opened from action button');
     }
 
     async openBackgroundSessionsDropdown(): Promise<void> {
@@ -1235,20 +1248,30 @@ ${message}`;
                 type: RovoDevProviderMessageType.OpenBackgroundSessionsDropdown,
             });
         }
-
-        Logger.debug('Background sessions dropdown opened from action button');
     }
 
     async listBackgroundSessionsForDropdown(): Promise<void> {
         try {
+            // Get the current main session port
+            const mainPort = this.getWorkspacePort();
+            const currentPort = this.getActiveRovoDevPort();
+
+            // Create the main session entry
+            const mainSession = {
+                id: 'main',
+                name: 'Main',
+                isActive: mainPort ? currentPort === mainPort : false,
+                isRunning: mainPort !== undefined, // Main session is running if it has a port
+            };
+
             // Get the Shipit webview provider from the container to access background sessions
             const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
-                // Send empty list if Shipit is not available
+                // Send only the main session if Shipit is not available
                 if (this._webView) {
                     await this._webView.postMessage({
                         type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
-                        sessions: [],
+                        sessions: [mainSession],
                     });
                 }
                 return;
@@ -1259,6 +1282,7 @@ ${message}`;
 
             // Note: The response will be handled by the ShipIt webview provider
             // and we'll receive the updated sessions through the backgroundSessionsList event
+            // We'll prepend the main session when we receive the background sessions
         } catch (error) {
             Logger.error(error as Error, 'Failed to list background sessions');
         }
@@ -1266,7 +1290,27 @@ ${message}`;
 
     async selectBackgroundSession(sessionId: string): Promise<void> {
         try {
-            // Get the Shipit webview provider to handle session switching
+            // Handle main session selection separately
+            if (sessionId === 'main') {
+                const mainPort = this.getWorkspacePort();
+
+                if (mainPort) {
+                    // Update the selected port in global state
+                    Container.context.globalState.update('selectedRovoDevPort', mainPort);
+
+                    // Use the same server switching logic as background sessions
+                    // Main session switch is to an existing session
+                    this.switchToServer(mainPort, false);
+
+                    // Refresh the sessions list to update active indicators
+                    await this.listBackgroundSessionsForDropdown();
+                } else {
+                    window.showWarningMessage('Main session is not available.');
+                }
+                return;
+            }
+
+            // Get the Shipit webview provider to handle background session switching
             const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
                 window.showWarningMessage('Background sessions require ShipIt integration.');
@@ -1283,6 +1327,12 @@ ${message}`;
 
     async deleteBackgroundSession(sessionId: string): Promise<void> {
         try {
+            // Prevent deletion of the main session
+            if (sessionId === 'main') {
+                window.showWarningMessage('The main session cannot be deleted.');
+                return;
+            }
+
             // Get the Shipit webview provider to handle session deletion
             const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
@@ -1345,7 +1395,6 @@ ${message}`;
         }
 
         // Log that a new named session was created
-        Logger.debug(`New background session "${sessionName}" created`);
     }
 
     private async createBackgroundSessionWithShipit(sessionName: string, prompt?: string): Promise<void> {
@@ -1353,25 +1402,24 @@ ${message}`;
             // Get the Shipit webview provider from the container
             const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
-                Logger.debug('Shipit webview provider not available');
                 window.showWarningMessage(
                     'Background sessions require ShipIt integration. Please ensure ShipIt is available.',
                 );
                 return;
             }
 
+            // Use the prompt as the session name if provided, otherwise use the given sessionName
+            const displayName = prompt && prompt.trim() ? prompt.trim() : sessionName;
+
             // Show initial message that session is being created
             const statusMessage = prompt
-                ? `Creating background session "${sessionName}" and starting prompt...`
-                : `Creating background session "${sessionName}"...`;
+                ? `Creating background session and starting prompt...`
+                : `Creating background session "${displayName}"...`;
             window.showInformationMessage(statusMessage);
 
             // Send message to create background session via Shipit
-            await shipitProvider.createBackgroundSession(sessionName, prompt);
-
-            Logger.debug(
-                `Background session "${sessionName}" creation request sent to Shipit${prompt ? ' with prompt' : ''}`,
-            );
+            // Pass the prompt as sessionName so ShipIt can create a meaningful name from it
+            await shipitProvider.createBackgroundSession(displayName, prompt);
 
             // If there's a prompt, let the user know it will run in the background
             if (prompt?.trim()) {
@@ -1385,7 +1433,6 @@ ${message}`;
         } catch (error) {
             const errorMessage = `Failed to create background session "${sessionName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
             window.showErrorMessage(errorMessage);
-            Logger.debug(errorMessage);
         }
     }
 
@@ -1440,25 +1487,47 @@ ${message}`;
             switch (response.type) {
                 case 'backgroundSessionsList':
                     if (response.status === 'success' && response.sessions) {
+                        // Get the currently selected port to determine active session
+                        const currentPort = this.getActiveRovoDevPort();
+                        const mainPort = this.getWorkspacePort();
+
+                        // Create the main session entry
+                        const mainSession = {
+                            id: 'main',
+                            name: 'Main',
+                            isActive: mainPort ? currentPort === mainPort : false,
+                            isRunning: mainPort !== undefined, // Main session is running if it has a port
+                        };
+
                         // Convert ShipIt session format to RovoDev format
-                        const sessions = response.sessions.map((session: any) => ({
+                        const backgroundSessions = response.sessions.map((session: any) => ({
                             id: session.sessionId,
                             name: session.sessionName,
-                            isActive: false, // We'll determine this based on current selection
+                            isActive: currentPort === session.port, // Check if this session is currently active
                             isRunning: true, // All sessions from ShipIt are running
-                            prompt: `Session on port ${session.port}`,
-                            port: session.port,
                         }));
+
+                        // Combine main session with background sessions (main session first)
+                        const allSessions = [mainSession, ...backgroundSessions];
 
                         await this._webView.postMessage({
                             type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
-                            sessions,
+                            sessions: allSessions,
                         });
                     } else {
-                        // Send empty list on error
+                        // Send only the main session on error
+                        const mainPort = this.getWorkspacePort();
+                        const currentPort = this.getActiveRovoDevPort();
+                        const mainSession = {
+                            id: 'main',
+                            name: 'Main',
+                            isActive: mainPort ? currentPort === mainPort : false,
+                            isRunning: mainPort !== undefined,
+                        };
+
                         await this._webView.postMessage({
                             type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
-                            sessions: [],
+                            sessions: [mainSession],
                         });
                     }
                     break;

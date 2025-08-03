@@ -151,15 +151,41 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
             try {
                 // Create worktree for the background session
                 const worktreePath = await this._worktreeManager.createWorktree();
-                const sessionId = `session_${Date.now()}`;
+                const port = this._worktreeManager.getWorktreeRovoDevPort(worktreePath);
+                const sessionId = `session_${port}`; // Use port for consistent ID
+
+                // Create a meaningful session name from the prompt if provided
+                let displayName = message.sessionName;
+                if (message.prompt && message.prompt.trim()) {
+                    // Use first 50 characters of the prompt as the session name
+                    const promptStart = message.prompt.trim();
+                    displayName = promptStart.length > 50 ? promptStart.substring(0, 47) + '...' : promptStart;
+                    // Clean up the name by removing newlines and extra spaces
+                    displayName = displayName.replace(/\s+/g, ' ').trim();
+                }
+
+                // Store session metadata in global state for later retrieval
+                const sessionMetadata = {
+                    sessionId,
+                    sessionName: displayName,
+                    originalPrompt: message.prompt,
+                    worktreePath,
+                    port,
+                    created: new Date().toISOString(),
+                };
+
+                // Get existing sessions and add this one
+                const existingSessions = Container.context.globalState.get<any[]>('backgroundSessions') || [];
+                existingSessions.push(sessionMetadata);
+                await Container.context.globalState.update('backgroundSessions', existingSessions);
 
                 this.postMessage({
                     type: 'backgroundSessionCreated',
                     status: 'success',
                     sessionId,
-                    sessionName: message.sessionName,
+                    sessionName: displayName,
                     worktreePath,
-                    port: this._worktreeManager.getWorktreeRovoDevPort(worktreePath),
+                    port,
                 });
 
                 // If there's a prompt, send it to the newly created worktree's RovoDev server
@@ -252,8 +278,8 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
                     Container.context.globalState.update('selectedRovoDevPort', port);
                     Container.context.globalState.update('selectedRovoDevPath', message.worktreePath);
 
-                    // Switch the main RovoDev chat to this server
-                    Container.rovodevWebviewProvider.switchToServer(port);
+                    // Switch the main RovoDev chat to this server (existing session)
+                    Container.rovodevWebviewProvider.switchToServer(port, false);
 
                     this.postMessage({
                         type: 'worktreeRovoDevConnected',
@@ -312,21 +338,30 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
             try {
                 // Get all RovoDev servers and filter for worktree sessions
                 const servers = this._worktreeManager.getAllRovoDevServers();
-                const backgroundSessions = servers
-                    .filter((server) => server.type === 'worktree')
-                    .map((server) => {
-                        // Extract session name from worktree path
-                        const pathParts = server.path.split('/');
-                        const sessionName = pathParts[pathParts.length - 1] || `Session-${server.port}`;
+                const worktreeSessions = servers.filter((server) => server.type === 'worktree');
 
-                        return {
-                            sessionId: `session_${server.port}`,
-                            sessionName,
-                            worktreePath: server.path,
-                            port: server.port,
-                            created: new Date().toISOString(), // TODO: Store actual creation time
-                        };
-                    });
+                // Get stored session metadata from global state
+                const storedSessions = Container.context.globalState.get<any[]>('backgroundSessions') || [];
+
+                const backgroundSessions = worktreeSessions.map((server) => {
+                    // Find matching stored metadata by port or path
+                    const metadata = storedSessions.find(
+                        (stored) => stored.port === server.port || stored.worktreePath === server.path,
+                    );
+
+                    // Use stored name if available, otherwise fallback to path-based name
+                    const sessionName =
+                        metadata?.sessionName || server.path.split('/').pop() || `Session-${server.port}`;
+
+                    return {
+                        sessionId: metadata?.sessionId || `session_${server.port}`,
+                        sessionName,
+                        originalPrompt: metadata?.originalPrompt, // Include original prompt for dropdown display
+                        worktreePath: server.path,
+                        port: server.port,
+                        created: metadata?.created || new Date().toISOString(),
+                    };
+                });
 
                 const response = {
                     type: 'backgroundSessionsList' as const,
@@ -377,8 +412,8 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
                 Container.context.globalState.update('selectedRovoDevPort', port);
                 Container.context.globalState.update('selectedRovoDevPath', targetServer.path);
 
-                // Switch the main RovoDev chat to this server
-                Container.rovodevWebviewProvider.switchToServer(port);
+                // Switch the main RovoDev chat to this server (existing session)
+                Container.rovodevWebviewProvider.switchToServer(port, false);
 
                 const response = {
                     type: 'backgroundSessionSelected' as const,
@@ -430,6 +465,13 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
                 const success = await this._worktreeManager.removeWorktree(targetServer.path);
 
                 if (success) {
+                    // Clean up stored session metadata
+                    const existingSessions = Container.context.globalState.get<any[]>('backgroundSessions') || [];
+                    const updatedSessions = existingSessions.filter(
+                        (session) => session.port !== port && session.worktreePath !== targetServer.path,
+                    );
+                    await Container.context.globalState.update('backgroundSessions', updatedSessions);
+
                     const response = {
                         type: 'backgroundSessionDeleted' as const,
                         status: 'success' as const,

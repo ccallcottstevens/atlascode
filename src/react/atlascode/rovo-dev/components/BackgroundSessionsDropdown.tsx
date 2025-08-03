@@ -3,10 +3,7 @@ import React, { useEffect, useRef } from 'react';
 interface BackgroundSession {
     id: string;
     name: string;
-    prompt?: string;
     isActive: boolean;
-    worktreePath?: string;
-    port?: number;
     isRunning?: boolean;
 }
 
@@ -27,7 +24,7 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
 }) => {
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Handle clicking outside the dropdown
+    // Handle clicking outside the dropdown and ESC key
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (isOpen && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -35,9 +32,17 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
             }
         };
 
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isOpen && event.key === 'Escape') {
+                onClose();
+            }
+        };
+
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         };
     }, [isOpen, onClose]);
 
@@ -73,6 +78,9 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
         >
             <div
                 style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                     fontSize: '13px',
                     fontWeight: '600',
                     color: 'var(--vscode-foreground)',
@@ -80,7 +88,34 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
                     padding: '4px 8px',
                 }}
             >
-                Background Sessions
+                <span>Background Sessions</span>
+                <button
+                    onClick={onClose}
+                    style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--vscode-descriptionForeground)',
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                        borderRadius: '2px',
+                        fontSize: '14px',
+                        lineHeight: '1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--vscode-button-secondaryHoverBackground)';
+                        e.currentTarget.style.color = 'var(--vscode-foreground)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = 'var(--vscode-descriptionForeground)';
+                    }}
+                    title="Close"
+                >
+                    ×
+                </button>
             </div>
 
             {sessions.length === 0 ? (
@@ -111,7 +146,9 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
                             border: '1px solid transparent',
                             cursor: 'pointer',
                         }}
-                        onClick={() => onSelectSession(session.id)}
+                        onClick={() => {
+                            onSelectSession(session.id);
+                        }}
                         onMouseEnter={(e) => {
                             if (!session.isActive) {
                                 e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground)';
@@ -129,27 +166,36 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
                                     fontSize: '13px',
                                     color: 'var(--vscode-foreground)',
                                     fontWeight: session.isActive ? '600' : '400',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    minWidth: 0, // Important for flex child to allow shrinking
                                 }}
                             >
-                                {session.name || `Session ${session.id.slice(0, 8)}`}
-                            </div>
-                            {session.prompt && (
-                                <div
+                                {session.isActive && (
+                                    <span
+                                        style={{
+                                            color: 'var(--vscode-charts-green)',
+                                            fontSize: '10px',
+                                            fontWeight: 'bold',
+                                            flexShrink: 0, // Prevent the dot from shrinking
+                                        }}
+                                    >
+                                        ●
+                                    </span>
+                                )}
+                                <span
                                     style={{
-                                        fontSize: '11px',
-                                        color: 'var(--vscode-descriptionForeground)',
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
                                         whiteSpace: 'nowrap',
-                                        marginTop: '2px',
+                                        flex: 1,
+                                        minWidth: 0, // Allow this span to shrink and trigger ellipsis
                                     }}
                                 >
-                                    {session.prompt}
-                                </div>
-                            )}
+                                    {session.name || `Session ${session.id.slice(0, 8)}`}
+                                </span>
+                            </div>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -164,30 +210,33 @@ export const BackgroundSessionsDropdown: React.FC<BackgroundSessionsDropdownProp
                                     title="Running"
                                 />
                             )}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteSession(session.id);
-                                }}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--vscode-descriptionForeground)',
-                                    cursor: 'pointer',
-                                    padding: '2px',
-                                    borderRadius: '2px',
-                                    fontSize: '12px',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--vscode-button-secondaryBackground)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                                title="Delete session"
-                            >
-                                ×
-                            </button>
+                            {session.id !== 'main' && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteSession(session.id);
+                                    }}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--vscode-descriptionForeground)',
+                                        cursor: 'pointer',
+                                        padding: '2px',
+                                        borderRadius: '2px',
+                                        fontSize: '12px',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor =
+                                            'var(--vscode-button-secondaryBackground)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                    title="Delete session"
+                                >
+                                    ×
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))

@@ -34,10 +34,7 @@ export interface RovoDevObjectResponse {
 export interface BackgroundSession {
     id: string;
     name: string;
-    prompt?: string;
     isActive: boolean;
-    worktreePath?: string;
-    port?: number;
     isRunning?: boolean;
 }
 
