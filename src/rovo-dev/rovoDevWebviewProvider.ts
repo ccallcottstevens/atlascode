@@ -1251,32 +1251,13 @@ ${message}`;
                 return;
             }
 
-            // For now, send mock data - this should be replaced with actual ShipIt integration
-            const mockSessions = [
-                {
-                    id: 'session-1',
-                    name: 'Main Development',
-                    isActive: true,
-                    isRunning: true,
-                    prompt: 'Working on the main feature branch',
-                    port: 8080,
-                },
-                {
-                    id: 'session-2',
-                    name: 'Bug Fix Session',
-                    isActive: false,
-                    isRunning: true,
-                    prompt: 'Fixing authentication issue',
-                    port: 8081,
-                },
-            ];
+            // Request background sessions from ShipIt
+            await shipitProvider.postMessage({
+                type: 'listBackgroundSessions',
+            });
 
-            if (this._webView) {
-                await this._webView.postMessage({
-                    type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
-                    sessions: mockSessions,
-                });
-            }
+            // Note: The response will be handled by the ShipIt webview provider
+            // and we'll receive the updated sessions through the backgroundSessionsList event
         } catch (error) {
             Logger.error(error as Error, 'Failed to list background sessions');
         }
@@ -1291,11 +1272,11 @@ ${message}`;
                 return;
             }
 
-            // For now, just show a message - this should be replaced with actual switching logic
-            window.showInformationMessage(`Switching to background session: ${sessionId}`);
-
-            // TODO: Implement actual session switching via ShipIt
-            // This would involve getting the session details and switching the RovoDev backend port
+            // Request session selection through ShipIt
+            await shipitProvider.postMessage({
+                type: 'selectBackgroundSession',
+                sessionId,
+            });
         } catch (error) {
             Logger.error(error as Error, 'Failed to select background session');
             window.showErrorMessage('Failed to switch to background session');
@@ -1311,7 +1292,7 @@ ${message}`;
                 return;
             }
 
-            // For now, just show a confirmation - this should be replaced with actual deletion logic
+            // Show confirmation dialog
             const confirmed = await window.showWarningMessage(
                 `Are you sure you want to delete the background session?`,
                 { modal: true },
@@ -1319,11 +1300,11 @@ ${message}`;
             );
 
             if (confirmed === 'Delete') {
-                window.showInformationMessage(`Deleting background session: ${sessionId}`);
-
-                // TODO: Implement actual session deletion via ShipIt
-                // After deletion, refresh the sessions list
-                this.listBackgroundSessionsForDropdown();
+                // Request session deletion through ShipIt
+                await shipitProvider.postMessage({
+                    type: 'deleteBackgroundSession',
+                    sessionId,
+                });
             }
         } catch (error) {
             Logger.error(error as Error, 'Failed to delete background session');
@@ -1345,75 +1326,11 @@ ${message}`;
                 return;
             }
 
-            // For now, show available options including creating a new session
-            const items = [
-                {
-                    label: '$(add) Start New Background Session',
-                    description: 'Create a new background session with a custom prompt',
-                    action: 'new',
-                },
-                {
-                    label: '$(home) Switch to Main Session',
-                    description: 'Return to the main RovoDev session',
-                    action: 'main',
-                },
-                {
-                    label: '$(list-unordered) View Active Sessions',
-                    description: 'See all running background sessions (requires ShipIt)',
-                    action: 'list',
-                },
-            ];
-
-            const selected = await window.showQuickPick(items, {
-                placeHolder: 'Select a session option',
-                title: 'RovoDev Background Sessions',
-            });
-
-            if (!selected) {
-                return; // User cancelled
-            }
-
-            switch (selected.action) {
-                case 'new':
-                    await this.startBackgroundSession();
-                    break;
-                case 'main':
-                    // Switch back to main session by getting the main workspace port
-                    const mainPort = this.getWorkspacePort();
-                    if (mainPort) {
-                        this.switchToServer(mainPort);
-                        window.showInformationMessage('Switched to main RovoDev session');
-                    } else {
-                        window.showWarningMessage('Could not find main RovoDev session port');
-                    }
-                    break;
-                case 'list':
-                    // Request list from ShipitWebviewProvider
-                    shipitProvider.postMessage({
-                        type: 'listWorktrees',
-                    });
-
-                    // Show information about how to access background sessions
-                    const response = await window.showInformationMessage(
-                        'Active background sessions are managed through ShipIt. Would you like to open the ShipIt view to see and manage your background sessions?',
-                        'Open ShipIt View',
-                        'Cancel',
-                    );
-
-                    if (response === 'Open ShipIt View') {
-                        // Focus the ShipIt webview if available
-                        commands.executeCommand('workbench.view.extension.atlascodeViewsContainer');
-                    }
-                    break;
-                default:
-                    break;
-            }
-
-            Logger.debug(`Background sessions action: ${selected.action}`);
+            // Open the background sessions dropdown instead of showing quick pick
+            this.openBackgroundSessionsDropdown();
         } catch (error) {
-            const errorMessage = `Failed to list background sessions: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            window.showErrorMessage(errorMessage);
-            Logger.debug(errorMessage);
+            Logger.error(error as Error, 'Failed to list background sessions');
+            window.showErrorMessage('Failed to access background sessions');
         }
     }
 
@@ -1517,6 +1434,66 @@ ${message}`;
         this._disposables = [];
         if (this._webView) {
             this._webView = undefined;
+        }
+    }
+
+    /**
+     * Handle background session responses from ShipIt webview provider
+     */
+    async handleShipItBackgroundSessionResponse(response: any): Promise<void> {
+        if (!this._webView) {
+            return;
+        }
+
+        try {
+            switch (response.type) {
+                case 'backgroundSessionsList':
+                    if (response.status === 'success' && response.sessions) {
+                        // Convert ShipIt session format to RovoDev format
+                        const sessions = response.sessions.map((session: any) => ({
+                            id: session.sessionId,
+                            name: session.sessionName,
+                            isActive: false, // We'll determine this based on current selection
+                            isRunning: true, // All sessions from ShipIt are running
+                            prompt: `Session on port ${session.port}`,
+                            port: session.port,
+                        }));
+
+                        await this._webView.postMessage({
+                            type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
+                            sessions,
+                        });
+                    } else {
+                        // Send empty list on error
+                        await this._webView.postMessage({
+                            type: RovoDevProviderMessageType.BackgroundSessionsUpdated,
+                            sessions: [],
+                        });
+                    }
+                    break;
+
+                case 'backgroundSessionSelected':
+                    if (response.status === 'success') {
+                        window.showInformationMessage(`Switched to background session`);
+                        // Refresh the sessions list to update active status
+                        this.listBackgroundSessionsForDropdown();
+                    } else {
+                        window.showErrorMessage(`Failed to switch session: ${response.error || 'Unknown error'}`);
+                    }
+                    break;
+
+                case 'backgroundSessionDeleted':
+                    if (response.status === 'success') {
+                        window.showInformationMessage(`Background session deleted`);
+                        // Refresh the sessions list
+                        this.listBackgroundSessionsForDropdown();
+                    } else {
+                        window.showErrorMessage(`Failed to delete session: ${response.error || 'Unknown error'}`);
+                    }
+                    break;
+            }
+        } catch (error) {
+            Logger.error(error as Error, 'Failed to handle ShipIt background session response');
         }
     }
 

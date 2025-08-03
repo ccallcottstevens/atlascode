@@ -57,7 +57,8 @@ export async function activate(context: ExtensionContext) {
 
         activateErrorReporting();
         registerRovoDevCommands(context);
-        context.subscriptions.push(new ShipitWebviewProvider(context.extensionPath));
+        Container.shipitWebviewProvider = new ShipitWebviewProvider(context.extensionPath);
+        context.subscriptions.push(Container.shipitWebviewProvider);
 
         if (!process.env.ROVODEV_BBY) {
             registerCommands(context);

@@ -308,6 +308,158 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
                 });
             }
         },
+        listBackgroundSessions: async (message) => {
+            try {
+                // Get all RovoDev servers and filter for worktree sessions
+                const servers = this._worktreeManager.getAllRovoDevServers();
+                const backgroundSessions = servers
+                    .filter((server) => server.type === 'worktree')
+                    .map((server) => {
+                        // Extract session name from worktree path
+                        const pathParts = server.path.split('/');
+                        const sessionName = pathParts[pathParts.length - 1] || `Session-${server.port}`;
+
+                        return {
+                            sessionId: `session_${server.port}`,
+                            sessionName,
+                            worktreePath: server.path,
+                            port: server.port,
+                            created: new Date().toISOString(), // TODO: Store actual creation time
+                        };
+                    });
+
+                const response = {
+                    type: 'backgroundSessionsList' as const,
+                    status: 'success' as const,
+                    sessions: backgroundSessions,
+                };
+
+                this.postMessage(response);
+
+                // Also notify RovoDev provider if available
+                if (Container.rovodevWebviewProvider) {
+                    Container.rovodevWebviewProvider.handleShipItBackgroundSessionResponse(response);
+                }
+            } catch (error) {
+                const errorResponse = {
+                    type: 'backgroundSessionsList' as const,
+                    status: 'error' as const,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+
+                this.postMessage(errorResponse);
+
+                // Also notify RovoDev provider if available
+                if (Container.rovodevWebviewProvider) {
+                    Container.rovodevWebviewProvider.handleShipItBackgroundSessionResponse(errorResponse);
+                }
+            }
+        },
+        selectBackgroundSession: async (message) => {
+            try {
+                // Extract port from session ID
+                const portMatch = message.sessionId.match(/session_(\d+)/);
+                if (!portMatch) {
+                    throw new Error('Invalid session ID format');
+                }
+
+                const port = parseInt(portMatch[1], 10);
+
+                // Find the corresponding worktree for this port
+                const servers = this._worktreeManager.getAllRovoDevServers();
+                const targetServer = servers.find((server) => server.port === port && server.type === 'worktree');
+
+                if (!targetServer) {
+                    throw new Error('Session not found or no longer available');
+                }
+
+                // Store the selected server info globally
+                Container.context.globalState.update('selectedRovoDevPort', port);
+                Container.context.globalState.update('selectedRovoDevPath', targetServer.path);
+
+                // Switch the main RovoDev chat to this server
+                Container.rovodevWebviewProvider.switchToServer(port);
+
+                const response = {
+                    type: 'backgroundSessionSelected' as const,
+                    status: 'success' as const,
+                    sessionId: message.sessionId,
+                    port,
+                };
+
+                this.postMessage(response);
+
+                // Also notify RovoDev provider if available
+                if (Container.rovodevWebviewProvider) {
+                    Container.rovodevWebviewProvider.handleShipItBackgroundSessionResponse(response);
+                }
+            } catch (error) {
+                const errorResponse = {
+                    type: 'backgroundSessionSelected' as const,
+                    status: 'error' as const,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+
+                this.postMessage(errorResponse);
+
+                // Also notify RovoDev provider if available
+                if (Container.rovodevWebviewProvider) {
+                    Container.rovodevWebviewProvider.handleShipItBackgroundSessionResponse(errorResponse);
+                }
+            }
+        },
+        deleteBackgroundSession: async (message) => {
+            try {
+                // Extract port from session ID
+                const portMatch = message.sessionId.match(/session_(\d+)/);
+                if (!portMatch) {
+                    throw new Error('Invalid session ID format');
+                }
+
+                const port = parseInt(portMatch[1], 10);
+
+                // Find the corresponding worktree for this port
+                const servers = this._worktreeManager.getAllRovoDevServers();
+                const targetServer = servers.find((server) => server.port === port && server.type === 'worktree');
+
+                if (!targetServer) {
+                    throw new Error('Session not found or no longer available');
+                }
+
+                // Remove the worktree (this will also stop the RovoDev server)
+                const success = await this._worktreeManager.removeWorktree(targetServer.path);
+
+                if (success) {
+                    const response = {
+                        type: 'backgroundSessionDeleted' as const,
+                        status: 'success' as const,
+                        sessionId: message.sessionId,
+                    };
+
+                    this.postMessage(response);
+
+                    // Also notify RovoDev provider if available
+                    if (Container.rovodevWebviewProvider) {
+                        Container.rovodevWebviewProvider.handleShipItBackgroundSessionResponse(response);
+                    }
+                } else {
+                    throw new Error('Failed to remove worktree');
+                }
+            } catch (error) {
+                const errorResponse = {
+                    type: 'backgroundSessionDeleted' as const,
+                    status: 'error' as const,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+
+                this.postMessage(errorResponse);
+
+                // Also notify RovoDev provider if available
+                if (Container.rovodevWebviewProvider) {
+                    Container.rovodevWebviewProvider.handleShipItBackgroundSessionResponse(errorResponse);
+                }
+            }
+        },
     };
 
     constructor(extensionPath: string) {

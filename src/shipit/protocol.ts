@@ -17,6 +17,13 @@ export type FromUI = {
         sessionName: string;
         prompt?: string;
     };
+    listBackgroundSessions: {};
+    selectBackgroundSession: {
+        sessionId: string;
+    };
+    deleteBackgroundSession: {
+        sessionId: string;
+    };
     listWorktrees: {};
     removeWorktree: {
         worktreePath: string;
@@ -55,6 +62,28 @@ export type ToUI = {
         sessionName?: string;
         worktreePath?: string;
         port?: number;
+        error?: string;
+    };
+    backgroundSessionsList: {
+        status: 'success' | 'error';
+        sessions?: Array<{
+            sessionId: string;
+            sessionName: string;
+            worktreePath: string;
+            port: number;
+            created: string;
+        }>;
+        error?: string;
+    };
+    backgroundSessionSelected: {
+        status: 'success' | 'error';
+        sessionId?: string;
+        port?: number;
+        error?: string;
+    };
+    backgroundSessionDeleted: {
+        status: 'success' | 'error';
+        sessionId?: string;
         error?: string;
     };
     worktreesList: {
