@@ -5,15 +5,15 @@ import './components/BackgroundSessionStyles.css';
 import CloseIcon from '@atlaskit/icon/core/close';
 import { highlightElement } from '@speed-highlight/core';
 import { detectLanguage } from '@speed-highlight/core/detect';
-import { useCallback, useState } from 'react';
 import * as React from 'react';
+import { useCallback, useState } from 'react';
 import { RovoDevContext, RovoDevContextItem } from 'src/rovo-dev/rovoDevTypes';
 import { v4 } from 'uuid';
 
 import { RovoDevResponse } from '../../../rovo-dev/responseParser';
 import { RovoDevProviderMessage, RovoDevProviderMessageType } from '../../../rovo-dev/rovoDevWebviewProviderMessages';
 import { useMessagingApi } from '../messagingApi';
-import { NewSessionModal } from './components/NewSessionModal';
+import { NewSessionDropdown } from './components/NewSessionDropdown';
 import { ChatStream } from './messaging/ChatStream';
 import { PromptInputBox } from './prompt-box/prompt-input/PromptInput';
 import { PromptContextCollection } from './prompt-box/promptContext/promptContextCollection';
@@ -708,7 +708,7 @@ const RovoDevView: React.FC = () => {
                 </div>
             </div>
             {isNewSessionModalOpen && (
-                <NewSessionModal
+                <NewSessionDropdown
                     isOpen={isNewSessionModalOpen}
                     onClose={() => setIsNewSessionModalOpen(false)}
                     onCreateBackgroundSession={handleNewSession}
