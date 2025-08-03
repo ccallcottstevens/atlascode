@@ -116,7 +116,7 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
                                             'Content-Type': 'application/json',
                                         },
                                         body: JSON.stringify({
-                                            message: message.message?.trim(),
+                                            message: message.message!.trim(),
                                             enable_deep_plan: false,
                                         }),
                                     });
@@ -522,6 +522,66 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
     };
 
     /**
+     * Create a background session with the given name and optional prompt
+     * This method can be called directly without requiring the webview to be initialized
+     */
+    public async createBackgroundSession(sessionName: string, prompt?: string): Promise<void> {
+        if (!this.handler.createBackgroundSession) {
+            return;
+        }
+        // Call the existing createBackgroundSession handler
+        this.handler.createBackgroundSession({
+            type: 'createBackgroundSession',
+            sessionName,
+            prompt,
+        });
+    }
+
+    /**
+     * List all background sessions
+     * This method can be called directly without requiring the webview to be initialized
+     */
+    public async listBackgroundSessions(): Promise<void> {
+        if (!this.handler.listBackgroundSessions) {
+            return;
+        }
+        // Call the existing listBackgroundSessions handler
+        this.handler.listBackgroundSessions({
+            type: 'listBackgroundSessions',
+        });
+    }
+
+    /**
+     * Select a background session by ID
+     * This method can be called directly without requiring the webview to be initialized
+     */
+    public async selectBackgroundSession(sessionId: string): Promise<void> {
+        if (!this.handler.selectBackgroundSession) {
+            return;
+        }
+        // Call the existing selectBackgroundSession handler
+        this.handler.selectBackgroundSession({
+            type: 'selectBackgroundSession',
+            sessionId,
+        });
+    }
+
+    /**
+     * Delete a background session by ID
+     * This method can be called directly without requiring the webview to be initialized
+     */
+    public async deleteBackgroundSession(sessionId: string): Promise<void> {
+        if (!this.handler.deleteBackgroundSession) {
+            return;
+        }
+        // Call the existing deleteBackgroundSession handler
+        this.handler.deleteBackgroundSession({
+            type: 'deleteBackgroundSession',
+            sessionId,
+        });
+    }
+
+    /**
      * Create a worktree and optionally send a message to the RovoDev server
      * This method can be called directly without requiring the webview to be initialized
      */
@@ -530,7 +590,7 @@ export class ShipitWebviewProvider extends Disposable implements WebviewViewProv
             return;
         }
         // Reuse the existing createWorktree handler logic
-        this.handler.createWorktree({ type: 'createWorktree', message: message! });
+        this.handler.createWorktree({ type: 'createWorktree', message: message });
     }
 
     private async waitFor(

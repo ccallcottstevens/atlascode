@@ -1226,6 +1226,9 @@ ${message}`;
             return;
         }
 
+        // Load background sessions and then open the dropdown
+        await this.listBackgroundSessionsForDropdown();
+
         // Send message to webview to open the BackgroundSessionsDropdown
         if (this._webView) {
             await this._webView.postMessage({
@@ -1239,7 +1242,7 @@ ${message}`;
     async listBackgroundSessionsForDropdown(): Promise<void> {
         try {
             // Get the Shipit webview provider from the container to access background sessions
-            const shipitProvider = Container.shipitWebviewProvider;
+            const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
                 // Send empty list if Shipit is not available
                 if (this._webView) {
@@ -1252,9 +1255,7 @@ ${message}`;
             }
 
             // Request background sessions from ShipIt
-            await shipitProvider.postMessage({
-                type: 'listBackgroundSessions',
-            });
+            await shipitProvider.listBackgroundSessions();
 
             // Note: The response will be handled by the ShipIt webview provider
             // and we'll receive the updated sessions through the backgroundSessionsList event
@@ -1266,17 +1267,14 @@ ${message}`;
     async selectBackgroundSession(sessionId: string): Promise<void> {
         try {
             // Get the Shipit webview provider to handle session switching
-            const shipitProvider = Container.shipitWebviewProvider;
+            const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
                 window.showWarningMessage('Background sessions require ShipIt integration.');
                 return;
             }
 
             // Request session selection through ShipIt
-            await shipitProvider.postMessage({
-                type: 'selectBackgroundSession',
-                sessionId,
-            });
+            await shipitProvider.selectBackgroundSession(sessionId);
         } catch (error) {
             Logger.error(error as Error, 'Failed to select background session');
             window.showErrorMessage('Failed to switch to background session');
@@ -1286,7 +1284,7 @@ ${message}`;
     async deleteBackgroundSession(sessionId: string): Promise<void> {
         try {
             // Get the Shipit webview provider to handle session deletion
-            const shipitProvider = Container.shipitWebviewProvider;
+            const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
                 window.showWarningMessage('Background sessions require ShipIt integration.');
                 return;
@@ -1301,10 +1299,7 @@ ${message}`;
 
             if (confirmed === 'Delete') {
                 // Request session deletion through ShipIt
-                await shipitProvider.postMessage({
-                    type: 'deleteBackgroundSession',
-                    sessionId,
-                });
+                await shipitProvider.deleteBackgroundSession(sessionId);
             }
         } catch (error) {
             Logger.error(error as Error, 'Failed to delete background session');
@@ -1318,7 +1313,7 @@ ${message}`;
 
         try {
             // Get the Shipit webview provider from the container
-            const shipitProvider = Container.shipitWebviewProvider;
+            const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
                 window.showWarningMessage(
                     'Background sessions require ShipIt integration. Please ensure ShipIt is available.',
@@ -1356,7 +1351,7 @@ ${message}`;
     private async createBackgroundSessionWithShipit(sessionName: string, prompt?: string): Promise<void> {
         try {
             // Get the Shipit webview provider from the container
-            const shipitProvider = Container.shipitWebviewProvider;
+            const shipitProvider = Container.shipitRovodevWebviewProvider;
             if (!shipitProvider) {
                 Logger.debug('Shipit webview provider not available');
                 window.showWarningMessage(
@@ -1372,11 +1367,7 @@ ${message}`;
             window.showInformationMessage(statusMessage);
 
             // Send message to create background session via Shipit
-            shipitProvider.postMessage({
-                type: 'createBackgroundSession',
-                sessionName,
-                prompt,
-            });
+            await shipitProvider.createBackgroundSession(sessionName, prompt);
 
             Logger.debug(
                 `Background session "${sessionName}" creation request sent to Shipit${prompt ? ' with prompt' : ''}`,
